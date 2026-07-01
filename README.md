@@ -1,4 +1,4 @@
-# Acemate Android Framework
+# XYJ Android Framework
 
 这是一个保留最基本开发框架的 Android 项目。
 
@@ -49,6 +49,36 @@
 ```bash
 ./offline-deps/install.sh
 ```
+
+## WSL 真机调试
+
+WSL 里可以负责编译，真机连接和安装建议复用 Windows 侧的 `adb.exe`。这样不需要把 USB 设备挂进 WSL。[下载地址](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
+
+1. Windows 下载并解压 Android SDK Platform-Tools，例如：
+
+   ```text
+   F:\Android\platform-tools\adb.exe
+   ```
+
+2. Windows PowerShell 确认设备已连接：
+
+   ```powershell
+   F:\Android\platform-tools\adb.exe devices -l
+   ```
+
+   需要看到设备状态为 `device`。
+
+3. WSL 编译 Debug APK：
+
+   ```bash
+   bash wsl_build.sh
+   ```
+
+4. WSL 直接调用 Windows 的 `adb.exe` 安装 APK：
+
+   ```bash
+   /mnt/f/Android/platform-tools/adb.exe install -r -t app/build/outputs/apk/debug/app-debug.apk
+   ```
 
 ## 常用命令
 

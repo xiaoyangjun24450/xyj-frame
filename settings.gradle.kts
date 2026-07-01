@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Acemate"
+rootProject.name = "XYJ"
 include(":app")

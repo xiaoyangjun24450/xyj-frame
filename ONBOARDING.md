@@ -1,4 +1,4 @@
-# Acemate 最小框架上手文档
+# XYJ 最小框架上手文档
 
 这个分支已经移除原有应用业务，只保留可继续开发的 Android 基础工程。
 
@@ -17,7 +17,7 @@
 
 1. 系统启动 `MainActivity`。
 2. `MainActivity` 创建一个居中的 `TextView`。
-3. 页面显示应用名 `Acemate`。
+3. 页面显示应用名 `XYJ`。
 
 ## 3. 开发建议
 
