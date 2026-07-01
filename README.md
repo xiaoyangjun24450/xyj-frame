@@ -63,7 +63,7 @@
 ```text
 app/src/main/
 ├── AndroidManifest.xml
-├── java/com/pku/acematetennis/MainActivity.kt
+├── java/com/xyj/focuspod/MainActivity.kt
 └── res/
     ├── values/
     └── values-night/

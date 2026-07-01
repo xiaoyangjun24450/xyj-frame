@@ -9,7 +9,7 @@
 - `gradle/libs.versions.toml`: 依赖和插件版本集中管理。
 - `app/build.gradle.kts`: App 模块构建配置。
 - `app/src/main/AndroidManifest.xml`: 应用入口声明。
-- `app/src/main/java/com/pku/acematetennis/MainActivity.kt`: 当前唯一页面。
+- `app/src/main/java/com/xyj/focuspod/MainActivity.kt`: 当前唯一页面。
 - `build.sh`: 安装 Debug 包。
 - `simulation.sh`: 查看应用日志。
 
@@ -21,7 +21,7 @@
 
 ## 3. 开发建议
 
-- 新页面从 `app/src/main/java/com/pku/acematetennis/` 下继续添加。
+- 新页面从 `app/src/main/java/com/xyj/focuspod/` 下继续添加。
 - 新资源放到 `app/src/main/res/` 对应目录。
 - 新依赖先写入 `gradle/libs.versions.toml`，再在 `app/build.gradle.kts` 中引用。
 

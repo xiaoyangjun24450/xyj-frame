@@ -11,11 +11,11 @@ plugins {
 }
 
 android {
-    namespace = "com.pku.acematetennis"
+    namespace = "com.xyj.focuspod"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.pku.acematetennis"
+        applicationId = "com.xyj.focuspod"
         minSdk = 24
         targetSdk = 36
         versionCode = versionProperties.getProperty("VERSION_CODE").toInt()
