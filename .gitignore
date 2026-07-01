@@ -1,0 +1,24 @@
+# Gradle and Android build outputs
+.gradle/
+.gradle-home/
+build/
+*/build/
+gradle/wrapper/gradle-wrapper.properties
+
+# Local machine configuration
+local.properties
+
+# IDE files
+.idea/
+*.iml
+
+# Android artifacts
+*.apk
+*.aab
+*.ap_
+
+# Local tool downloads
+offline-deps/*.zip
+
+# Logs
+*.log
