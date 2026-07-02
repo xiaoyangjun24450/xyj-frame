@@ -3,7 +3,6 @@
 .gradle-home/
 build/
 */build/
-gradle/wrapper/gradle-wrapper.properties
 
 # Local machine configuration
 local.properties

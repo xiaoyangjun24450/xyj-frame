@@ -8,6 +8,7 @@ val versionProperties = Properties().apply {
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -28,6 +29,10 @@ android {
         }
     }
 
+    buildFeatures {
+        compose = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -42,4 +47,15 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+
+    val composeBom = platform(libs.androidx.compose.bom)
+    implementation(composeBom)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }
