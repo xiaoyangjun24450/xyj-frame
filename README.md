@@ -50,6 +50,35 @@
 ./offline-deps/install.sh
 ```
 
+## 豆包语音辅导配置
+
+辅导页已接入火山引擎豆包 Dialog 语音 SDK。鉴权参数不要提交到仓库，建议写在本机 `local.properties`：
+
+```properties
+doubao.appId=你的 AppID
+doubao.token=你的 Access Token
+```
+
+可选配置：
+
+```properties
+doubao.uid=student-001
+doubao.appKey=默认使用 doubao.appId，通常不用填
+doubao.resourceId=volc.speech.dialog
+doubao.dialogAddress=wss://openspeech.bytedance.com
+doubao.dialogUri=/api/v3/realtime/dialogue
+doubao.botName=豆包
+doubao.aecModelPath=/absolute/path/to/aec.model
+doubao.debugPath=/absolute/path/to/existing/log/dir
+doubao.recorderPath=/absolute/path/to/existing/recorder/dir
+doubao.playerPath=/absolute/path/to/existing/player/dir
+doubao.logLevel=WARN
+```
+
+如果控制台只显示 `APP ID`、`Access Token`、`Secret Key`，这里先只填 `APP ID` 和 `Access Token`。当前 SDK 报错中的 `X-Api-App-Key` 期望值是 `APP ID`，所以 `doubao.appKey` 默认也会使用 `doubao.appId`；不要把 `Secret Key` 填到 `doubao.appKey`，否则会出现 `invalid X-Api-App-Key`。
+
+不配置 `doubao.appId`、`doubao.token` 时，辅导页会保留题目和本地引导文案，但语音会话会显示配置缺失提示。开启 AEC 时需要额外提供文档里的 `aec.model` 文件路径。
+
 ## WSL 真机调试
 
 WSL 里可以负责编译，真机连接和安装建议复用 Windows 侧的 `adb.exe`。这样不需要把 USB 设备挂进 WSL。[下载地址](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)

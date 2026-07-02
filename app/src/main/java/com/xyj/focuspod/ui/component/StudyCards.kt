@@ -24,6 +24,8 @@ import com.xyj.focuspod.model.DeviceCheckItem
 import com.xyj.focuspod.model.DeviceCheckStatus
 import com.xyj.focuspod.model.Question
 import com.xyj.focuspod.model.StudyPlan
+import com.xyj.focuspod.model.TutoringMessage
+import com.xyj.focuspod.model.TutoringSpeaker
 import com.xyj.focuspod.ui.theme.FocusPrimary
 import com.xyj.focuspod.ui.theme.FocusPrimarySoft
 import com.xyj.focuspod.ui.theme.FocusSuccess
@@ -94,8 +96,8 @@ fun QuestionCard(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = question?.prompt.orEmpty(),
+            MarkdownText(
+                markdown = question?.questionMarkdown.orEmpty(),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -105,7 +107,7 @@ fun QuestionCard(
 
 @Composable
 fun AiGuidePanel(
-    text: String,
+    messages: List<TutoringMessage>,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -120,7 +122,27 @@ fun AiGuidePanel(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(10.dp))
-            Text(text = text, style = MaterialTheme.typography.bodyLarge)
+            if (messages.isEmpty()) {
+                Text(text = "正在连接语音辅导。", style = MaterialTheme.typography.bodyLarge)
+            } else {
+                messages.forEach { message ->
+                    val speakerText = when (message.speaker) {
+                        TutoringSpeaker.AI -> "AI"
+                        TutoringSpeaker.STUDENT -> "学生"
+                    }
+                    val textColor = when (message.speaker) {
+                        TutoringSpeaker.AI -> MaterialTheme.colorScheme.onSurface
+                        TutoringSpeaker.STUDENT -> MaterialTheme.colorScheme.primary
+                    }
+
+                    Text(
+                        text = "$speakerText：${message.text}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
         }
     }
 }

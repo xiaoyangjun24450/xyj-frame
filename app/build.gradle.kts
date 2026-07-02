@@ -5,6 +5,23 @@ val versionProperties = Properties().apply {
     rootProject.file("version.properties").inputStream().use { load(it) }
 }
 
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun configValue(name: String, defaultValue: String = ""): String {
+    return providers.gradleProperty(name).orNull
+        ?: localProperties.getProperty(name)
+        ?: defaultValue
+}
+
+fun String.asBuildConfigString(): String {
+    return "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -21,16 +38,36 @@ android {
         targetSdk = 36
         versionCode = versionProperties.getProperty("VERSION_CODE").toInt()
         versionName = versionProperties.getProperty("VERSION_NAME")
+
+        val doubaoAppId = configValue("doubao.appId")
+        buildConfigField("String", "DOUBAO_APP_ID", doubaoAppId.asBuildConfigString())
+        buildConfigField("String", "DOUBAO_APP_KEY", configValue("doubao.appKey", doubaoAppId).asBuildConfigString())
+        buildConfigField("String", "DOUBAO_TOKEN", configValue("doubao.token").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_UID", configValue("doubao.uid", "student-001").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_RESOURCE_ID", configValue("doubao.resourceId", "volc.speech.dialog").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_DIALOG_ADDRESS", configValue("doubao.dialogAddress", "wss://openspeech.bytedance.com").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_DIALOG_URI", configValue("doubao.dialogUri", "/api/v3/realtime/dialogue").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_BOT_NAME", configValue("doubao.botName", "豆包").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_AEC_MODEL_PATH", configValue("doubao.aecModelPath").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_DEBUG_PATH", configValue("doubao.debugPath").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_RECORDER_PATH", configValue("doubao.recorderPath").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_PLAYER_PATH", configValue("doubao.playerPath").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_LOG_LEVEL", configValue("doubao.logLevel", "WARN").asBuildConfigString())
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -55,6 +92,8 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.bytedance.speechengine.tob)
+    implementation(libs.okhttp)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

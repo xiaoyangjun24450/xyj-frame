@@ -14,7 +14,11 @@ import com.xyj.focuspod.model.StudyPage
 import com.xyj.focuspod.model.StudyPlan
 import com.xyj.focuspod.model.StudySessionState
 import com.xyj.focuspod.model.StudyStage
+import com.xyj.focuspod.model.TutoringMessage
+import com.xyj.focuspod.model.TutoringSpeaker
 import com.xyj.focuspod.service.ai.GradingAiService
+import com.xyj.focuspod.service.ai.TutoringAiListener
+import com.xyj.focuspod.service.ai.TutoringAiService
 import com.xyj.focuspod.service.api.StudyPlanApi
 import com.xyj.focuspod.service.camera.CameraCaptureService
 import com.xyj.focuspod.service.device.DoorControlService
@@ -25,6 +29,7 @@ class StudyFlow(
     private val studyPlanApi: StudyPlanApi,
     private val poseDetector: PoseDetector,
     private val cameraCaptureService: CameraCaptureService,
+    private val tutoringAiService: TutoringAiService,
     private val gradingAiService: GradingAiService,
     private val doorControlService: DoorControlService
 ) {
@@ -37,6 +42,8 @@ class StudyFlow(
     private val examResults = mutableListOf<GradeResult>()
     private var completedAttemptCount = 0
     private var hasStartedCurrentPage = false
+    private var tutoringMessageSequence = 0
+    private var tutoringRetryCount = 0
 
     fun observe(listener: (StudySessionState) -> Unit) {
         listeners += listener
@@ -91,13 +98,17 @@ class StudyFlow(
         if (hasStartedCurrentPage) return
         hasStartedCurrentPage = true
         when (state.page) {
-            StudyPage.TUTORING,
+            StudyPage.TUTORING -> startTutoringVoiceSession()
             StudyPage.EXAM -> waitForFlipToGrade()
             StudyPage.GRADING -> runGrading()
             StudyPage.GRADE_RESULT -> runResultCountdown()
             StudyPage.DONE -> runDoorOpen()
             else -> Unit
         }
+    }
+
+    fun release() {
+        tutoringAiService.release()
     }
 
     private fun loadPlans() {
@@ -149,6 +160,7 @@ class StudyFlow(
             enterExamQuestion()
             return
         }
+        tutoringRetryCount = 0
         update(
             state.copy(
                 page = StudyPage.TUTORING,
@@ -157,7 +169,13 @@ class StudyFlow(
                 remainingCount = activeStageQuestions.size - exampleIndex,
                 lastGradeResult = null,
                 alertMessage = null,
-                voiceCaption = "正在讲解 ${question.title}。完成后请翻转手机开始批卷。"
+                voiceCaption = "正在讲解 ${question.title}，可以直接向 AI 提问。",
+                tutoringMessages = listOf(
+                    newTutoringMessage(
+                        TutoringSpeaker.AI,
+                        initialGuideText(question)
+                    )
+                )
             )
         )
     }
@@ -197,6 +215,53 @@ class StudyFlow(
                 )
             }
         }
+    }
+
+    private fun startTutoringVoiceSession() {
+        val question = state.currentQuestion ?: return
+        val questionId = question.id
+        update(state.copy(voiceCaption = "正在连接豆包语音辅导。"))
+        tutoringAiService.startSession(
+            stage = state.stage,
+            question = question,
+            listener = object : TutoringAiListener {
+                override fun onSessionStarted() {
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        tutoringRetryCount = 0
+                        update(
+                            state.copy(
+                                alertMessage = null,
+                                voiceCaption = "豆包语音已连接，可以直接提问。"
+                            )
+                        )
+                    }
+                }
+
+                override fun onStudentSpeech(text: String) {
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        appendTutoringMessage(TutoringSpeaker.STUDENT, text)
+                    }
+                }
+
+                override fun onAiResponse(text: String) {
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        appendTutoringMessage(TutoringSpeaker.AI, text)
+                    }
+                }
+
+                override fun onCaption(text: String) {
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        update(state.copy(voiceCaption = text))
+                    }
+                }
+
+                override fun onError(message: String) {
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        handleTutoringError(questionId, message)
+                    }
+                }
+            }
+        )
     }
 
     private fun runGrading() {
@@ -302,8 +367,12 @@ class StudyFlow(
             Question(
                 id = "review-${examRound}-${index + 1}",
                 title = "错题讲解 ${index + 1}",
-                prompt = original?.prompt ?: "请复盘本题的关键步骤。",
-                subject = original?.subject ?: plan.subject,
+                questionMarkdown = original?.questionMarkdown ?: "请复盘本题的关键步骤。",
+                answer = original?.answer.orEmpty(),
+                solutionMarkdown = original?.solutionMarkdown.orEmpty(),
+                knowledgePoints = original?.knowledgePoints.orEmpty(),
+                tutoringPrompt = original?.tutoringPrompt ?: "引导学生复盘本题条件、关系式和易错点。不要直接告诉最终答案。",
+                gradingPrompt = original?.gradingPrompt ?: "检查学生是否修正了本题关键思路和计算过程。",
                 source = QuestionSource.MISTAKE_REVIEW
             )
         }
@@ -357,12 +426,90 @@ class StudyFlow(
         }
     }
 
+    private fun appendTutoringMessage(speaker: TutoringSpeaker, text: String) {
+        val cleanText = text.trim()
+        if (cleanText.isEmpty()) return
+
+        val currentMessages = state.tutoringMessages
+        val messages = if (currentMessages.lastOrNull()?.speaker == speaker) {
+            currentMessages.dropLast(1) + newTutoringMessage(speaker, cleanText)
+        } else {
+            currentMessages + newTutoringMessage(speaker, cleanText)
+        }.takeLast(MAX_TUTORING_MESSAGES)
+
+        update(state.copy(tutoringMessages = messages))
+    }
+
+    private fun newTutoringMessage(speaker: TutoringSpeaker, text: String): TutoringMessage {
+        tutoringMessageSequence += 1
+        return TutoringMessage(
+            id = "tutor-message-$tutoringMessageSequence",
+            speaker = speaker,
+            text = text
+        )
+    }
+
+    private fun initialGuideText(question: Question): String {
+        return if (question.source == QuestionSource.MISTAKE_REVIEW) {
+            "这是一道错题复盘例题。先回忆题目条件，再找出关系式，最后检查单位。"
+        } else {
+            "先读题找已知条件，再把问题拆成两步。系统只做引导，不直接给最终答案。"
+        }
+    }
+
+    private fun isCurrentTutoringQuestion(questionId: String): Boolean {
+        return state.page == StudyPage.TUTORING && state.currentQuestion?.id == questionId
+    }
+
+    private fun handleTutoringError(questionId: String, message: String) {
+        if (!shouldRetryTutoring(message) || tutoringRetryCount >= MAX_TUTORING_RETRY_COUNT) {
+            update(
+                state.copy(
+                    alertMessage = message,
+                    voiceCaption = "语音辅导暂不可用，请检查豆包配置、麦克风权限或网络。"
+                )
+            )
+            return
+        }
+
+        tutoringRetryCount += 1
+        update(
+            state.copy(
+                alertMessage = "$message\n正在第 $tutoringRetryCount 次重连语音辅导。",
+                voiceCaption = "豆包语音连接异常，正在自动重连。"
+            )
+        )
+        handler.postDelayed({
+            if (isCurrentTutoringQuestion(questionId)) {
+                tutoringAiService.stopSession()
+                startTutoringVoiceSession()
+            }
+        }, TUTORING_RETRY_DELAY_MS)
+    }
+
+    private fun shouldRetryTutoring(message: String): Boolean {
+        return !message.contains("未配置") &&
+            !message.contains("权限") &&
+            !message.contains("AppID") &&
+            !message.contains("AppKey") &&
+            !message.contains("Token")
+    }
+
     private fun update(newState: StudySessionState) {
         val previousPage = state.page
+        if (previousPage == StudyPage.TUTORING && newState.page != StudyPage.TUTORING) {
+            tutoringAiService.stopSession()
+        }
         state = newState
         if (previousPage != newState.page) {
             hasStartedCurrentPage = false
         }
         listeners.forEach { it(state) }
+    }
+
+    private companion object {
+        const val MAX_TUTORING_MESSAGES = 6
+        const val MAX_TUTORING_RETRY_COUNT = 2
+        const val TUTORING_RETRY_DELAY_MS = 1_500L
     }
 }

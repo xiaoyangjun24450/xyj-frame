@@ -1,0 +1,382 @@
+{
+  "plans": [
+    {
+      "id": "math-plan-001",
+      "title": "分数应用题练习",
+      "subject": "数学",
+      "passScore": 80,
+      "estimatedMinutes": 20,
+      "exampleQuestions": [
+        {
+          "id": "example-001",
+          "title": "例题：分数应用题",
+          "questionMarkdown": "一根绳子长 **24 米**，用去了 $\\frac{1}{3}$。还剩多少米？",
+          "answer": "16 米",
+          "solutionMarkdown": "先算用去多少米：$24 \\times \\frac{1}{3} = 8$。\n\n再算剩下多少米：$24 - 8 = 16$。",
+          "knowledgePoints": [
+            "求一个数的几分之几",
+            "剩余量计算"
+          ],
+          "tutoringPrompt": "引导学生先找总量，再理解用去了三分之一，最后思考剩余量怎么计算。不要直接告诉最终答案。",
+          "gradingPrompt": "检查学生是否先算出用去 8 米，再算出剩余 16 米，并注意单位。"
+        },
+        {
+          "id": "example-002",
+          "title": "例题：行程问题",
+          "questionMarkdown": "甲乙两地相距 **180 千米**，一辆车 **3 小时** 行完全程。平均每小时行多少千米？",
+          "answer": "60 千米",
+          "solutionMarkdown": "平均每小时行驶的路程：$180 \\div 3 = 60$ 千米。",
+          "knowledgePoints": [
+            "速度计算",
+            "除法应用题"
+          ],
+          "tutoringPrompt": "引导学生找出总路程和总时间，再思考平均每小时行多少应该用什么运算。不要直接告诉最终答案。",
+          "gradingPrompt": "检查学生是否用 180 除以 3，并写出 60 千米每小时或 60 千米。"
+        }
+      ],
+      "examQuestions": [
+        {
+          "id": "exam-001",
+          "title": "考试题：折扣计算",
+          "questionMarkdown": "一件商品原价 **120 元**，打八折后又优惠 **6 元**，实际付款多少元？",
+          "answer": "90 元",
+          "solutionMarkdown": "八折后的价格：$120 \\times 0.8 = 96$ 元。\n\n再优惠 6 元：$96 - 6 = 90$ 元。",
+          "knowledgePoints": [
+            "折扣",
+            "多步计算"
+          ],
+          "tutoringPrompt": "引导学生先理解八折表示原价的 80%，再扣掉优惠金额。不要直接告诉最终答案。",
+          "gradingPrompt": "检查学生是否先算出八折价 96 元，再减去 6 元得到 90 元。"
+        },
+        {
+          "id": "exam-002",
+          "title": "考试题：工程问题",
+          "questionMarkdown": "一本书 **96 页**，小明 **4 天** 读了全书的 $\\frac{1}{2}$。照这样读完还需要几天？",
+          "answer": "4 天",
+          "solutionMarkdown": "4 天读了全书的一半，剩下还有全书的一半。\n\n照同样速度，读完剩下的一半还需要 4 天。",
+          "knowledgePoints": [
+            "分数意义",
+            "工程问题"
+          ],
+          "tutoringPrompt": "引导学生发现已读一半用了 4 天，剩下也是一半，所以时间相同。不要直接告诉最终答案。",
+          "gradingPrompt": "检查学生是否理解剩下的一半和已经读的一半相同，因此还需要 4 天。"
+        }
+      ]
+    },
+    {
+      "id": "chinese-plan-001",
+      "title": "语文阅读表达训练",
+      "subject": "语文",
+      "passScore": 80,
+      "estimatedMinutes": 20,
+      "exampleQuestions": [
+        {
+          "id": "chinese-example-001",
+          "title": "例题：概括段意",
+          "questionMarkdown": "阅读短文第一段，用 **一句话** 概括这一段主要写了什么。",
+          "answer": "写清人物、事件和主要结果即可。",
+          "solutionMarkdown": "概括段意时先找这一段主要人物，再找主要事件，最后用一句完整的话表达。",
+          "knowledgePoints": [
+            "段意概括",
+            "提取关键信息"
+          ],
+          "tutoringPrompt": "引导学生先找这一段写的是谁，再找发生了什么事，最后合成一句话。不要直接替学生写答案。",
+          "gradingPrompt": "检查学生是否抓住主要人物、主要事件，表达是否简洁完整。"
+        },
+        {
+          "id": "chinese-example-002",
+          "title": "例题：修辞判断",
+          "questionMarkdown": "句子“月亮像小船一样挂在天空”用了什么修辞手法？有什么表达效果？",
+          "answer": "比喻。把月亮比作小船，写出了月亮弯弯的形状。",
+          "solutionMarkdown": "句中有“像”，把月亮和小船联系起来，说明用了比喻。表达效果要说明写出了什么特点。",
+          "knowledgePoints": [
+            "比喻",
+            "表达效果"
+          ],
+          "tutoringPrompt": "引导学生找比喻词和本体、喻体，再思考小船和月亮哪里相像。不要直接告诉完整答案。",
+          "gradingPrompt": "检查学生是否判断为比喻，并能说出写出月亮弯弯的特点。"
+        }
+      ],
+      "examQuestions": [
+        {
+          "id": "chinese-exam-001",
+          "title": "考试题：词语理解",
+          "questionMarkdown": "结合上下文，解释“坚持不懈”在句子中的意思。",
+          "answer": "一直坚持，不放弃。",
+          "solutionMarkdown": "理解词语要联系上下文，看人物做事时是否持续努力、没有放弃。",
+          "knowledgePoints": [
+            "词语理解",
+            "联系上下文"
+          ],
+          "tutoringPrompt": "引导学生回到句子里看人物做了什么，判断这个词强调坚持还是速度。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否解释出持续坚持、不放弃的意思。"
+        },
+        {
+          "id": "chinese-exam-002",
+          "title": "考试题：仿写句子",
+          "questionMarkdown": "仿照“春风轻轻地吹醒了小草”，写一个拟人句。",
+          "answer": "示例：太阳公公慢慢地叫醒了大地。",
+          "solutionMarkdown": "拟人句要把事物当作人来写，可以让自然事物做人的动作。",
+          "knowledgePoints": [
+            "拟人",
+            "句子仿写"
+          ],
+          "tutoringPrompt": "引导学生先找原句里把谁当成人写，再选择一个事物配上人的动作。不要直接替学生写句子。",
+          "gradingPrompt": "检查学生是否把事物当作人来写，句子是否通顺。"
+        }
+      ]
+    },
+    {
+      "id": "english-plan-001",
+      "title": "英语基础句型训练",
+      "subject": "英语",
+      "passScore": 75,
+      "estimatedMinutes": 18,
+      "exampleQuestions": [
+        {
+          "id": "english-example-001",
+          "title": "例题：一般现在时",
+          "questionMarkdown": "用正确形式填空：She usually **______** (go) to school by bus.",
+          "answer": "goes",
+          "solutionMarkdown": "主语 She 是第三人称单数，一般现在时中动词 go 要变为 goes。",
+          "knowledgePoints": [
+            "一般现在时",
+            "第三人称单数"
+          ],
+          "tutoringPrompt": "引导学生先找主语，再判断是不是第三人称单数，最后思考动词形式。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否填 goes，并能说明第三人称单数动词加 es。"
+        },
+        {
+          "id": "english-example-002",
+          "title": "例题：阅读细节",
+          "questionMarkdown": "Read the sentence: **Tom has breakfast at seven.** What time does Tom have breakfast?",
+          "answer": "At seven.",
+          "solutionMarkdown": "句子中直接给出 Tom has breakfast at seven，所以答案是 At seven.",
+          "knowledgePoints": [
+            "阅读细节",
+            "时间表达"
+          ],
+          "tutoringPrompt": "引导学生在原句中找到表示时间的词组，再用简短英语回答。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否回答 seven 或 at seven。"
+        }
+      ],
+      "examQuestions": [
+        {
+          "id": "english-exam-001",
+          "title": "考试题：单词拼写",
+          "questionMarkdown": "根据中文写英文单词：**图书馆**。",
+          "answer": "library",
+          "solutionMarkdown": "“图书馆”的英文是 library，注意拼写为 l-i-b-r-a-r-y。",
+          "knowledgePoints": [
+            "基础词汇",
+            "单词拼写"
+          ],
+          "tutoringPrompt": "引导学生回忆学校地点类单词，并关注首字母和结尾拼写。不要直接拼出完整单词。",
+          "gradingPrompt": "检查学生是否写出 library，允许大小写不同。"
+        },
+        {
+          "id": "english-exam-002",
+          "title": "考试题：句型转换",
+          "questionMarkdown": "把句子改为否定句：**He likes apples.**",
+          "answer": "He doesn't like apples.",
+          "solutionMarkdown": "主语 He 是第三人称单数，否定句用 doesn't，后面的 likes 要还原成 like。",
+          "knowledgePoints": [
+            "否定句",
+            "第三人称单数"
+          ],
+          "tutoringPrompt": "引导学生先判断主语，再选择 don't 还是 doesn't，最后记得动词还原。不要直接给完整句子。",
+          "gradingPrompt": "检查学生是否使用 doesn't，并把 likes 还原为 like。"
+        }
+      ]
+    },
+    {
+      "id": "physics-plan-001",
+      "title": "物理基础概念训练",
+      "subject": "物理",
+      "passScore": 80,
+      "estimatedMinutes": 22,
+      "exampleQuestions": [
+        {
+          "id": "physics-example-001",
+          "title": "例题：速度计算",
+          "questionMarkdown": "小车 **10 秒** 行驶 **50 米**，它的平均速度是多少米每秒？",
+          "answer": "5 米/秒",
+          "solutionMarkdown": "平均速度 = 路程 ÷ 时间，所以 $50 \\div 10 = 5$ 米/秒。",
+          "knowledgePoints": [
+            "速度",
+            "路程时间关系"
+          ],
+          "tutoringPrompt": "引导学生先找路程和时间，再回忆速度公式。不要直接告诉最终答案。",
+          "gradingPrompt": "检查学生是否用 50 除以 10，并写出 5 米/秒。"
+        },
+        {
+          "id": "physics-example-002",
+          "title": "例题：力的作用",
+          "questionMarkdown": "用手推门，门会转动。这个现象说明力可以改变物体的什么？",
+          "answer": "力可以改变物体的运动状态。",
+          "solutionMarkdown": "门从静止到转动，说明运动状态发生变化，所以力可以改变物体的运动状态。",
+          "knowledgePoints": [
+            "力的作用效果",
+            "运动状态"
+          ],
+          "tutoringPrompt": "引导学生观察门推之前和推之后有什么变化，再归纳力的作用效果。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否答到改变运动状态，表达相近即可。"
+        }
+      ],
+      "examQuestions": [
+        {
+          "id": "physics-exam-001",
+          "title": "考试题：密度",
+          "questionMarkdown": "一个物体质量 **200 克**，体积 **100 立方厘米**，它的密度是多少？",
+          "answer": "2 克/立方厘米",
+          "solutionMarkdown": "密度 = 质量 ÷ 体积，所以 $200 \\div 100 = 2$ 克/立方厘米。",
+          "knowledgePoints": [
+            "密度",
+            "公式计算"
+          ],
+          "tutoringPrompt": "引导学生先找质量和体积，再使用密度公式。不要直接告诉最终答案。",
+          "gradingPrompt": "检查学生是否用 200 除以 100，并写出正确单位。"
+        },
+        {
+          "id": "physics-exam-002",
+          "title": "考试题：光的反射",
+          "questionMarkdown": "照镜子时能看到自己，主要利用了光的什么现象？",
+          "answer": "光的反射。",
+          "solutionMarkdown": "镜子能把照到它上面的光反射回来，所以人能看到镜中的自己。",
+          "knowledgePoints": [
+            "光的反射",
+            "生活现象解释"
+          ],
+          "tutoringPrompt": "引导学生想镜子会让光线发生什么变化，再联系反射概念。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否回答光的反射。"
+        }
+      ]
+    },
+    {
+      "id": "chemistry-plan-001",
+      "title": "化学入门现象训练",
+      "subject": "化学",
+      "passScore": 78,
+      "estimatedMinutes": 20,
+      "exampleQuestions": [
+        {
+          "id": "chemistry-example-001",
+          "title": "例题：物理变化",
+          "questionMarkdown": "冰融化成水，物质本身有没有变成新物质？这属于什么变化？",
+          "answer": "没有变成新物质，属于物理变化。",
+          "solutionMarkdown": "冰和水都是同一种物质，只是状态改变了，没有生成新物质，所以是物理变化。",
+          "knowledgePoints": [
+            "物理变化",
+            "新物质判断"
+          ],
+          "tutoringPrompt": "引导学生判断变化前后有没有新物质生成，再区分物理变化和化学变化。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否答出没有新物质生成，属于物理变化。"
+        },
+        {
+          "id": "chemistry-example-002",
+          "title": "例题：空气成分",
+          "questionMarkdown": "空气中含量最多的气体是什么？",
+          "answer": "氮气。",
+          "solutionMarkdown": "空气中含量最多的是氮气，其次是氧气。",
+          "knowledgePoints": [
+            "空气成分",
+            "氮气"
+          ],
+          "tutoringPrompt": "引导学生回忆空气主要成分排序，区分最多和支持燃烧的气体。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否回答氮气。"
+        }
+      ],
+      "examQuestions": [
+        {
+          "id": "chemistry-exam-001",
+          "title": "考试题：实验现象",
+          "questionMarkdown": "蜡烛燃烧时会发光发热，这说明发生了什么变化？",
+          "answer": "化学变化。",
+          "solutionMarkdown": "蜡烛燃烧会生成新物质，同时发光发热，所以属于化学变化。",
+          "knowledgePoints": [
+            "化学变化",
+            "燃烧现象"
+          ],
+          "tutoringPrompt": "引导学生判断燃烧是否生成新物质，再联系化学变化特征。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否答出化学变化，并能简单说明有新物质生成。"
+        },
+        {
+          "id": "chemistry-exam-002",
+          "title": "考试题：物质分类",
+          "questionMarkdown": "水、氧气、铁三种物质中，哪一种是化合物？",
+          "answer": "水。",
+          "solutionMarkdown": "水由氢、氧两种元素组成，是化合物；氧气和铁都是单质。",
+          "knowledgePoints": [
+            "单质和化合物",
+            "物质分类"
+          ],
+          "tutoringPrompt": "引导学生判断每种物质由几种元素组成，再区分单质和化合物。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否选择水，并能说明由两种元素组成。"
+        }
+      ]
+    },
+    {
+      "id": "history-plan-001",
+      "title": "历史基础线索训练",
+      "subject": "历史",
+      "passScore": 80,
+      "estimatedMinutes": 24,
+      "exampleQuestions": [
+        {
+          "id": "history-example-001",
+          "title": "例题：时间顺序",
+          "questionMarkdown": "把“秦统一六国”和“汉朝建立”按发生时间先后排序。",
+          "answer": "秦统一六国在前，汉朝建立在后。",
+          "solutionMarkdown": "秦朝先统一六国，之后秦朝灭亡，刘邦建立汉朝，所以秦统一六国在前。",
+          "knowledgePoints": [
+            "朝代顺序",
+            "秦汉历史"
+          ],
+          "tutoringPrompt": "引导学生先想秦朝和汉朝哪个在前，再判断两个事件的先后。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否把秦统一六国排在汉朝建立之前。"
+        },
+        {
+          "id": "history-example-002",
+          "title": "例题：人物事件",
+          "questionMarkdown": "说出与“商鞅变法”相关的一个主要影响。",
+          "answer": "使秦国逐渐强大。",
+          "solutionMarkdown": "商鞅变法推动秦国政治、经济和军事发展，使秦国实力增强。",
+          "knowledgePoints": [
+            "商鞅变法",
+            "秦国强大"
+          ],
+          "tutoringPrompt": "引导学生回忆商鞅变法发生在哪个国家，以及对这个国家实力有什么影响。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否答到增强秦国实力、推动秦国强大等意思。"
+        }
+      ],
+      "examQuestions": [
+        {
+          "id": "history-exam-001",
+          "title": "考试题：朝代判断",
+          "questionMarkdown": "“开元盛世”出现在哪个朝代？",
+          "answer": "唐朝。",
+          "solutionMarkdown": "开元盛世是唐玄宗前期出现的繁荣局面，属于唐朝。",
+          "knowledgePoints": [
+            "唐朝",
+            "开元盛世"
+          ],
+          "tutoringPrompt": "引导学生回忆开元盛世和哪位皇帝、哪个朝代有关。不要直接告诉答案。",
+          "gradingPrompt": "检查学生是否回答唐朝。"
+        },
+        {
+          "id": "history-exam-002",
+          "title": "考试题：历史意义",
+          "questionMarkdown": "秦统一文字和度量衡，对国家管理有什么帮助？",
+          "answer": "有利于交流、经济往来和统一管理。",
+          "solutionMarkdown": "统一文字方便政令传达和文化交流；统一度量衡方便贸易和赋税管理。",
+          "knowledgePoints": [
+            "秦朝统一措施",
+            "历史意义"
+          ],
+          "tutoringPrompt": "引导学生分别思考文字统一和度量衡统一对交流、贸易、管理有什么帮助。不要直接告诉完整答案。",
+          "gradingPrompt": "检查学生是否答到方便交流、经济往来或国家统一管理。"
+        }
+      ]
+    }
+  ]
+}

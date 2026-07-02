@@ -5,6 +5,8 @@ coreKtx = "1.17.0"
 composeBom = "2026.06.00"
 activityCompose = "1.13.0"
 junit = "4.13.2"
+okhttp = "4.9.1"
+speechEngineTob = "0.0.14.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -16,6 +18,8 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+bytedance-speechengine-tob = { group = "com.bytedance.speechengine", name = "speechengine_tob", version.ref = "speechEngineTob" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

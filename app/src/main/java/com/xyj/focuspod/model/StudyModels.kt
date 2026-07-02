@@ -19,8 +19,12 @@ enum class StudyStage {
 data class Question(
     val id: String,
     val title: String,
-    val prompt: String,
-    val subject: String,
+    val questionMarkdown: String,
+    val answer: String,
+    val solutionMarkdown: String,
+    val knowledgePoints: List<String>,
+    val tutoringPrompt: String,
+    val gradingPrompt: String,
     val source: QuestionSource = QuestionSource.ORIGINAL
 )
 
@@ -33,10 +37,10 @@ data class StudyPlan(
     val id: String,
     val title: String,
     val subject: String,
-    val estimatedMinutes: Int,
     val passScore: Int,
     val exampleQuestions: List<Question>,
-    val examQuestions: List<Question>
+    val examQuestions: List<Question>,
+    val estimatedMinutes: Int = 0
 )
 
 data class GradeResult(
@@ -45,6 +49,17 @@ data class GradeResult(
     val score: Int,
     val passed: Boolean,
     val feedback: String
+)
+
+enum class TutoringSpeaker {
+    AI,
+    STUDENT
+}
+
+data class TutoringMessage(
+    val id: String,
+    val speaker: TutoringSpeaker,
+    val text: String
 )
 
 enum class DeviceCheckStatus {
@@ -84,6 +99,7 @@ data class StudySessionState(
     val availablePlans: List<StudyPlan> = emptyList(),
     val deviceChecks: List<DeviceCheckItem> = emptyList(),
     val voiceCaption: String = "",
+    val tutoringMessages: List<TutoringMessage> = emptyList(),
     val gradingStep: GradingStep = GradingStep.CAPTURING,
     val resultCountdownSeconds: Int = 10,
     val doorStatus: DoorStatus = DoorStatus.OPENING,
