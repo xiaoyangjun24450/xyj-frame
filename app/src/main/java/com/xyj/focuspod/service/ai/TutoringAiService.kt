@@ -20,7 +20,6 @@ interface TutoringAiService {
 interface TutoringAiListener {
     fun onSessionStarted()
     fun onStudentSpeech(text: String)
-    fun onAiResponse(text: String)
     fun onCaption(text: String)
     fun onError(message: String)
 }

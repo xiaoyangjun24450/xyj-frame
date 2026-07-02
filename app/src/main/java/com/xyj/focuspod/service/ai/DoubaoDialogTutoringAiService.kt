@@ -10,6 +10,7 @@ import com.bytedance.speech.speechengine.SpeechEngineGenerator
 import com.xyj.focuspod.model.Question
 import com.xyj.focuspod.model.QuestionSource
 import com.xyj.focuspod.model.StudyStage
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -58,7 +59,6 @@ class DoubaoDialogTutoringAiService(
 
         sessionStarted = true
         listener.onSessionStarted()
-        listener.onCaption("豆包语音已连接，可以直接提问。")
     }
 
     override fun stopSession() {
@@ -79,57 +79,54 @@ class DoubaoDialogTutoringAiService(
     }
 
     override fun onSpeechMessage(type: Int, data: ByteArray, len: Int) {
-        val message = String(data, 0, len.coerceAtMost(data.size), StandardCharsets.UTF_8)
+        val payloadLength = len.coerceIn(0, data.size)
+        val message = decodeTextPayload(data, payloadLength)
         handler.post {
             when (type) {
                 SpeechEngineDefines.MESSAGE_TYPE_ENGINE_START,
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_SESSION_STARTED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_SESSION_STARTED -> {
-                    listener?.onCaption("语音会话已启动。")
                     sendPendingQuestionContext()
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_ASR_INFO,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_ASR_INFO -> {
-                    listener?.onCaption("正在听你说话。")
+                    Unit
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_ASR_RESPONSE,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_ASR_RESPONSE -> {
-                    extractText(message)?.let {
+                    message?.let(::extractText)?.let {
                         listener?.onStudentSpeech(it)
-                        listener?.onCaption("你说：$it")
                     }
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_ASR_ENDED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_ASR_ENDED -> {
-                    listener?.onCaption("已收到问题，正在组织引导。")
+                    Unit
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_CHAT_RESPONSE,
-                SpeechEngineDefines.MESSAGE_TYPE_EVENT_CHAT_RESPONSE,
+                SpeechEngineDefines.MESSAGE_TYPE_EVENT_CHAT_RESPONSE -> {
+                    Unit
+                }
+
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_TTS_RESPONSE,
-                SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_RESPONSE,
-                SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_SUBTITLE -> {
-                    extractText(message)?.let {
-                        listener?.onAiResponse(it)
-                        listener?.onCaption(it)
-                    }
+                SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_RESPONSE -> {
+                    Unit
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_CHAT_ENDED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_CHAT_ENDED,
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_TTS_ENDED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_ENDED -> {
-                    listener?.onCaption("可以继续提问，完成后翻转手机开始批卷。")
+                    Unit
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_ENGINE_STOP,
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_SESSION_FINISHED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_SESSION_FINISHED -> {
                     sessionStarted = false
-                    listener?.onCaption("语音会话已结束。")
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_ENGINE_ERROR,
@@ -137,7 +134,7 @@ class DoubaoDialogTutoringAiService(
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_SESSION_FAILED,
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_CONNECTION_FAILED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_CONNECTION_FAILED -> {
-                    listener?.onError("豆包语音异常：${message.ifBlank { type.toString() }}")
+                    listener?.onError("豆包语音异常：${message?.takeIf { it.isNotBlank() } ?: type.toString()}")
                 }
             }
         }
@@ -190,12 +187,35 @@ class DoubaoDialogTutoringAiService(
         engine.setOptionString(SpeechEngineDefines.PARAMS_KEY_DIALOG_RECORDER_PATH_STRING, config.recorderPath)
         engine.setOptionString(SpeechEngineDefines.PARAMS_KEY_DIALOG_PLAYER_PATH_STRING, config.playerPath)
 
-        val aecFile = config.aecModelPath.takeIf { it.isNotBlank() }?.let(::File)
+        val aecFile = resolveAecModelFile()
         val enableAec = aecFile?.exists() == true
         engine.setOptionBoolean(SpeechEngineDefines.PARAMS_KEY_ENABLE_AEC_BOOL, enableAec)
         if (enableAec) {
             engine.setOptionString(SpeechEngineDefines.PARAMS_KEY_AEC_MODEL_PATH_STRING, aecFile.absolutePath)
         }
+    }
+
+    private fun resolveAecModelFile(): File? {
+        val configuredFile = config.aecModelPath
+            .takeIf { it.isNotBlank() }
+            ?.let(::File)
+            ?.takeIf { it.exists() }
+        if (configuredFile != null) return configuredFile
+
+        val assetAecFile = File(context.filesDir, AEC_MODEL_FILE_PATH)
+        if (assetAecFile.exists()) return assetAecFile
+
+        return runCatching {
+            assetAecFile.parentFile?.mkdirs()
+            context.assets.open(AEC_MODEL_ASSET_PATH).use { input ->
+                assetAecFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            assetAecFile
+        }.onFailure {
+            Log.w(TAG, "AEC model is unavailable, AEC will be disabled.", it)
+        }.getOrNull()
     }
 
     private fun sendQuestionContext(engine: SpeechEngine, stage: StudyStage, question: Question) {
@@ -257,29 +277,80 @@ class DoubaoDialogTutoringAiService(
         return result
     }
 
+    private fun decodeTextPayload(data: ByteArray, length: Int): String? {
+        if (length <= 0 || isKnownBinaryPayload(data, length)) return null
+
+        val text = String(data, 0, length, StandardCharsets.UTF_8).trim()
+        if (text.isBlank()) return null
+        if (text.startsWith("OggS")) return null
+
+        val replacementCount = text.count { it == '\uFFFD' }
+        if (replacementCount > maxOf(1, text.length / 20)) return null
+
+        val controlCount = text.count { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }
+        if (controlCount > 0) return null
+
+        return text
+    }
+
+    private fun isKnownBinaryPayload(data: ByteArray, length: Int): Boolean {
+        if (length >= OGG_MAGIC.size && OGG_MAGIC.indices.all { data[it] == OGG_MAGIC[it] }) {
+            return true
+        }
+        return (0 until length).any { data[it] == 0.toByte() }
+    }
+
     private fun extractText(raw: String): String? {
         if (raw.isBlank()) return null
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return raw
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return raw.trim()
         return TEXT_KEYS.firstNotNullOfOrNull { key ->
-            json.optString(key).takeIf { it.isNotBlank() }
-        } ?: extractNestedText(json) ?: raw
+            json.optString(key).takeIf { isReadableSpeechText(it) }
+        } ?: extractNestedText(json)
     }
 
     private fun extractNestedText(json: JSONObject): String? {
         json.keys().forEach { key ->
             val value = json.opt(key)
-            if (value is JSONObject) {
-                val nested = TEXT_KEYS.firstNotNullOfOrNull { textKey ->
-                    value.optString(textKey).takeIf { it.isNotBlank() }
-                } ?: extractNestedText(value)
-                if (!nested.isNullOrBlank()) return nested
+            val nested = when (value) {
+                is JSONObject -> extractTextFromJson(value)
+                is JSONArray -> extractTextFromArray(value)
+                else -> null
             }
+            if (!nested.isNullOrBlank()) return nested
         }
         return null
     }
 
+    private fun extractTextFromJson(json: JSONObject): String? {
+        return TEXT_KEYS.firstNotNullOfOrNull { textKey ->
+            json.optString(textKey).takeIf { isReadableSpeechText(it) }
+        } ?: extractNestedText(json)
+    }
+
+    private fun extractTextFromArray(array: JSONArray): String? {
+        for (index in 0 until array.length()) {
+            val nested = when (val value = array.opt(index)) {
+                is JSONObject -> extractTextFromJson(value)
+                is JSONArray -> extractTextFromArray(value)
+                is String -> value.takeIf { isReadableSpeechText(it) }
+                else -> null
+            }
+            if (!nested.isNullOrBlank()) return nested
+        }
+        return null
+    }
+
+    private fun isReadableSpeechText(text: String): Boolean {
+        val cleanText = text.trim()
+        if (cleanText.isBlank()) return false
+        return !cleanText.startsWith("{") && !cleanText.startsWith("[")
+    }
+
     companion object {
         private const val TAG = "DoubaoDialogTutoring"
+        private const val AEC_MODEL_ASSET_PATH = "doubao/aec.model"
+        private const val AEC_MODEL_FILE_PATH = "doubao/aec.model"
+        private val OGG_MAGIC = byteArrayOf(0x4F, 0x67, 0x67, 0x53)
         private val TEXT_KEYS = listOf(
             "content",
             "text",

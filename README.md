@@ -57,6 +57,7 @@
 ```properties
 doubao.appId=你的 AppID
 doubao.token=你的 Access Token
+doubao.appKey=PlgvMymc7f3tQnJ6
 ```
 
 可选配置：

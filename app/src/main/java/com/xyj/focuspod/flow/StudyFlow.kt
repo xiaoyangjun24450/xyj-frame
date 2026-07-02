@@ -169,13 +169,8 @@ class StudyFlow(
                 remainingCount = activeStageQuestions.size - exampleIndex,
                 lastGradeResult = null,
                 alertMessage = null,
-                voiceCaption = "正在讲解 ${question.title}，可以直接向 AI 提问。",
-                tutoringMessages = listOf(
-                    newTutoringMessage(
-                        TutoringSpeaker.AI,
-                        initialGuideText(question)
-                    )
-                )
+                voiceCaption = "",
+                tutoringMessages = emptyList()
             )
         )
     }
@@ -220,7 +215,6 @@ class StudyFlow(
     private fun startTutoringVoiceSession() {
         val question = state.currentQuestion ?: return
         val questionId = question.id
-        update(state.copy(voiceCaption = "正在连接豆包语音辅导。"))
         tutoringAiService.startSession(
             stage = state.stage,
             question = question,
@@ -230,8 +224,7 @@ class StudyFlow(
                         tutoringRetryCount = 0
                         update(
                             state.copy(
-                                alertMessage = null,
-                                voiceCaption = "豆包语音已连接，可以直接提问。"
+                                alertMessage = null
                             )
                         )
                     }
@@ -240,19 +233,12 @@ class StudyFlow(
                 override fun onStudentSpeech(text: String) {
                     if (isCurrentTutoringQuestion(questionId)) {
                         appendTutoringMessage(TutoringSpeaker.STUDENT, text)
-                    }
-                }
-
-                override fun onAiResponse(text: String) {
-                    if (isCurrentTutoringQuestion(questionId)) {
-                        appendTutoringMessage(TutoringSpeaker.AI, text)
+                        updateTutoringVoiceCaption(text)
                     }
                 }
 
                 override fun onCaption(text: String) {
-                    if (isCurrentTutoringQuestion(questionId)) {
-                        update(state.copy(voiceCaption = text))
-                    }
+                    // Tutoring captions only show recognized student speech and AI replies.
                 }
 
                 override fun onError(message: String) {
@@ -449,24 +435,22 @@ class StudyFlow(
         )
     }
 
-    private fun initialGuideText(question: Question): String {
-        return if (question.source == QuestionSource.MISTAKE_REVIEW) {
-            "这是一道错题复盘例题。先回忆题目条件，再找出关系式，最后检查单位。"
-        } else {
-            "先读题找已知条件，再把问题拆成两步。系统只做引导，不直接给最终答案。"
-        }
-    }
-
     private fun isCurrentTutoringQuestion(questionId: String): Boolean {
         return state.page == StudyPage.TUTORING && state.currentQuestion?.id == questionId
+    }
+
+    private fun updateTutoringVoiceCaption(text: String) {
+        val cleanText = text.trim()
+        if (cleanText.isEmpty()) return
+
+        update(state.copy(voiceCaption = "你说：$cleanText"))
     }
 
     private fun handleTutoringError(questionId: String, message: String) {
         if (!shouldRetryTutoring(message) || tutoringRetryCount >= MAX_TUTORING_RETRY_COUNT) {
             update(
                 state.copy(
-                    alertMessage = message,
-                    voiceCaption = "语音辅导暂不可用，请检查豆包配置、麦克风权限或网络。"
+                    alertMessage = message
                 )
             )
             return
@@ -475,8 +459,7 @@ class StudyFlow(
         tutoringRetryCount += 1
         update(
             state.copy(
-                alertMessage = "$message\n正在第 $tutoringRetryCount 次重连语音辅导。",
-                voiceCaption = "豆包语音连接异常，正在自动重连。"
+                alertMessage = "$message\n正在第 $tutoringRetryCount 次重连语音辅导。"
             )
         )
         handler.postDelayed({

@@ -25,7 +25,6 @@ import com.xyj.focuspod.model.DeviceCheckStatus
 import com.xyj.focuspod.model.Question
 import com.xyj.focuspod.model.StudyPlan
 import com.xyj.focuspod.model.TutoringMessage
-import com.xyj.focuspod.model.TutoringSpeaker
 import com.xyj.focuspod.ui.theme.FocusPrimary
 import com.xyj.focuspod.ui.theme.FocusPrimarySoft
 import com.xyj.focuspod.ui.theme.FocusSuccess
@@ -106,7 +105,7 @@ fun QuestionCard(
 }
 
 @Composable
-fun AiGuidePanel(
+fun VoiceRecordPanel(
     messages: List<TutoringMessage>,
     modifier: Modifier = Modifier
 ) {
@@ -117,28 +116,19 @@ fun AiGuidePanel(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "AI 引导",
+                text = "语音记录",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(10.dp))
             if (messages.isEmpty()) {
-                Text(text = "正在连接语音辅导。", style = MaterialTheme.typography.bodyLarge)
+                Text(text = "等待学生提问。", style = MaterialTheme.typography.bodyLarge)
             } else {
                 messages.forEach { message ->
-                    val speakerText = when (message.speaker) {
-                        TutoringSpeaker.AI -> "AI"
-                        TutoringSpeaker.STUDENT -> "学生"
-                    }
-                    val textColor = when (message.speaker) {
-                        TutoringSpeaker.AI -> MaterialTheme.colorScheme.onSurface
-                        TutoringSpeaker.STUDENT -> MaterialTheme.colorScheme.primary
-                    }
-
                     Text(
-                        text = "$speakerText：${message.text}",
+                        text = "学生：${message.text}",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = textColor
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
