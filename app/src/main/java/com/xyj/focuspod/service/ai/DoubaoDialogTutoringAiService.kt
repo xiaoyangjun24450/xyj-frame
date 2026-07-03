@@ -10,9 +10,11 @@ import com.bytedance.speech.speechengine.SpeechEngineGenerator
 import com.xyj.focuspod.model.Question
 import com.xyj.focuspod.model.QuestionSource
 import com.xyj.focuspod.model.StudyStage
+import com.xyj.focuspod.model.TutoringSpeaker
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 class DoubaoDialogTutoringAiService(
@@ -25,6 +27,7 @@ class DoubaoDialogTutoringAiService(
     private var listener: TutoringAiListener? = null
     private var sessionStarted = false
     private var pendingQuestionContext: PendingQuestionContext? = null
+    private var lastAiCaption: String = ""
 
     override fun startSession(
         stage: StudyStage,
@@ -46,7 +49,13 @@ class DoubaoDialogTutoringAiService(
         ) ?: return
 
         val startPayload = JSONObject()
-            .put("dialog", JSONObject().put("bot_name", config.botName))
+            .put(
+                "dialog",
+                JSONObject()
+                    .put("bot_name", config.botName)
+                    .put("SubtitleConfig", subtitleConfigJson())
+            )
+            .put("SubtitleConfig", subtitleConfigJson())
             .toString()
         if (currentEngine.sendChecked(
                 SpeechEngineDefines.DIRECTIVE_START_ENGINE,
@@ -65,6 +74,7 @@ class DoubaoDialogTutoringAiService(
         val currentEngine = engine ?: return
         sessionStarted = false
         pendingQuestionContext = null
+        lastAiCaption = ""
         currentEngine.sendDirective(SpeechEngineDefines.DIRECTIVE_SYNC_STOP_ENGINE, "")
         listener = null
     }
@@ -73,6 +83,7 @@ class DoubaoDialogTutoringAiService(
         val currentEngine = engine ?: return
         sessionStarted = false
         pendingQuestionContext = null
+        lastAiCaption = ""
         listener = null
         currentEngine.destroyEngine()
         engine = null
@@ -80,9 +91,24 @@ class DoubaoDialogTutoringAiService(
 
     override fun onSpeechMessage(type: Int, data: ByteArray, len: Int) {
         val payloadLength = len.coerceIn(0, data.size)
+        val subtitles = decodeSubtitlePayload(data, payloadLength)
         val message = decodeTextPayload(data, payloadLength)
         handler.post {
+            logReadableMessage(type, message)
             when (type) {
+                SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_SUBTITLE -> {
+                    val parsedSubtitles = subtitles.ifEmpty {
+                        message?.let(::parseSubtitleJson).orEmpty()
+                    }
+                    if (parsedSubtitles.isNotEmpty()) {
+                        parsedSubtitles.forEach { listener?.onSubtitle(it) }
+                    } else {
+                        message?.let(::extractText)?.let {
+                            emitAiCaption(it)
+                        }
+                    }
+                }
+
                 SpeechEngineDefines.MESSAGE_TYPE_ENGINE_START,
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_SESSION_STARTED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_SESSION_STARTED -> {
@@ -108,12 +134,23 @@ class DoubaoDialogTutoringAiService(
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_CHAT_RESPONSE,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_CHAT_RESPONSE -> {
-                    Unit
+                    message?.let(::extractText)?.let {
+                        emitAiCaption(it)
+                    }
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_TTS_RESPONSE,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_RESPONSE -> {
-                    Unit
+                    message?.let(::extractText)?.let {
+                        emitAiCaption(it)
+                    }
+                }
+
+                SpeechEngineDefines.MESSAGE_TYPE_DIALOG_TTS_SENTENCE_END,
+                SpeechEngineDefines.MESSAGE_TYPE_EVENT_TTS_SENTENCE_END -> {
+                    message?.let(::extractText)?.let {
+                        emitAiCaption(it)
+                    }
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_CHAT_ENDED,
@@ -140,8 +177,26 @@ class DoubaoDialogTutoringAiService(
         }
     }
 
+    fun onRoomBinaryMessageReceived(uid: String, buffer: ByteBuffer) {
+        val message = ByteArray(buffer.remaining())
+        buffer.slice().get(message)
+        val subtitles = decodeSubtitlePayload(message, message.size)
+        if (subtitles.isEmpty()) return
+
+        handler.post {
+            subtitles.forEach { listener?.onSubtitle(it) }
+        }
+    }
+
     override fun onSpeechLogid(logid: String) {
         Log.d(TAG, "Doubao speech logid: $logid")
+    }
+
+    private fun emitAiCaption(text: String) {
+        val cleanText = text.trim()
+        if (cleanText.isBlank() || cleanText == lastAiCaption) return
+        lastAiCaption = cleanText
+        listener?.onCaption(cleanText)
     }
 
     private fun ensureEngine(listener: TutoringAiListener): SpeechEngine? {
@@ -264,6 +319,12 @@ class DoubaoDialogTutoringAiService(
         )
     }
 
+    private fun subtitleConfigJson(): JSONObject {
+        return JSONObject()
+            .put("DisableRTSSubtitle", false)
+            .put("SubtitleMode", SUBTITLE_MODE_FAST)
+    }
+
     private fun SpeechEngine.sendChecked(
         directive: Int,
         payload: String,
@@ -293,8 +354,83 @@ class DoubaoDialogTutoringAiService(
         return text
     }
 
+    private fun logReadableMessage(type: Int, message: String?) {
+        if (message.isNullOrBlank()) return
+        if (type !in DIALOG_MESSAGE_TYPE_RANGE && type !in EVENT_MESSAGE_TYPE_RANGE) return
+        Log.d(TAG, "Speech message type=$type payload=${message.take(MAX_LOG_PAYLOAD_LENGTH)}")
+    }
+
+    private fun decodeSubtitlePayload(data: ByteArray, length: Int): List<TutoringSubtitle> {
+        val subtitleJson = unpackSubtitlePayload(data, length) ?: return emptyList()
+        return parseSubtitleJson(subtitleJson)
+    }
+
+    private fun unpackSubtitlePayload(data: ByteArray, length: Int): String? {
+        if (length < SUBTITLE_HEADER_SIZE) return null
+        if (!SUBTITLE_MAGIC.indices.all { data[it] == SUBTITLE_MAGIC[it] }) return null
+
+        val subtitleLength = ((data[4].toInt() and 0xff) shl 24) or
+            ((data[5].toInt() and 0xff) shl 16) or
+            ((data[6].toInt() and 0xff) shl 8) or
+            (data[7].toInt() and 0xff)
+        if (length - SUBTITLE_HEADER_SIZE != subtitleLength) return null
+        if (subtitleLength <= 0) return ""
+
+        return String(data, SUBTITLE_HEADER_SIZE, subtitleLength, StandardCharsets.UTF_8).trim()
+    }
+
+    private fun parseSubtitleJson(raw: String): List<TutoringSubtitle> {
+        if (raw.isBlank()) return emptyList()
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyList()
+        val data = json.opt("data")
+        val subtitleItems = when (data) {
+            is JSONArray -> data.asJsonObjects()
+            is JSONObject -> listOf(data)
+            else -> emptyList()
+        }
+        return subtitleItems.mapNotNull(::parseSubtitleItem)
+    }
+
+    private fun parseSubtitleItem(json: JSONObject): TutoringSubtitle? {
+        val text = json.optString("text").trim()
+        if (text.isBlank()) return null
+
+        val userId = json.optString("userId")
+        return TutoringSubtitle(
+            speaker = subtitleSpeaker(userId),
+            text = text,
+            definite = json.optBoolean("definite", false),
+            paragraph = json.optBoolean("paragraph", false),
+            sequence = json.optInt("sequence", -1),
+            roundId = json.optInt("roundId", -1)
+        )
+    }
+
+    private fun JSONArray.asJsonObjects(): List<JSONObject> {
+        val objects = mutableListOf<JSONObject>()
+        for (index in 0 until length()) {
+            val item = opt(index)
+            if (item is JSONObject) {
+                objects += item
+            }
+        }
+        return objects
+    }
+
+    private fun subtitleSpeaker(userId: String): TutoringSpeaker {
+        val normalizedUserId = userId.trim()
+        return if (normalizedUserId.isNotBlank() && normalizedUserId == config.uid) {
+            TutoringSpeaker.STUDENT
+        } else {
+            TutoringSpeaker.AI
+        }
+    }
+
     private fun isKnownBinaryPayload(data: ByteArray, length: Int): Boolean {
         if (length >= OGG_MAGIC.size && OGG_MAGIC.indices.all { data[it] == OGG_MAGIC[it] }) {
+            return true
+        }
+        if (length >= SUBTITLE_MAGIC.size && SUBTITLE_MAGIC.indices.all { data[it] == SUBTITLE_MAGIC[it] }) {
             return true
         }
         return (0 until length).any { data[it] == 0.toByte() }
@@ -350,7 +486,10 @@ class DoubaoDialogTutoringAiService(
         private const val TAG = "DoubaoDialogTutoring"
         private const val AEC_MODEL_ASSET_PATH = "doubao/aec.model"
         private const val AEC_MODEL_FILE_PATH = "doubao/aec.model"
+        private const val SUBTITLE_HEADER_SIZE = 8
+        private const val SUBTITLE_MODE_FAST = 1
         private val OGG_MAGIC = byteArrayOf(0x4F, 0x67, 0x67, 0x53)
+        private val SUBTITLE_MAGIC = byteArrayOf(0x73, 0x75, 0x62, 0x76)
         private val TEXT_KEYS = listOf(
             "content",
             "text",
@@ -359,6 +498,9 @@ class DoubaoDialogTutoringAiService(
             "sentence",
             "subtitle"
         )
+        private const val MAX_LOG_PAYLOAD_LENGTH = 600
+        private val DIALOG_MESSAGE_TYPE_RANGE = 3000..3018
+        private val EVENT_MESSAGE_TYPE_RANGE = 3000..3028
     }
 }
 

@@ -19,6 +19,7 @@ import com.xyj.focuspod.model.TutoringSpeaker
 import com.xyj.focuspod.service.ai.GradingAiService
 import com.xyj.focuspod.service.ai.TutoringAiListener
 import com.xyj.focuspod.service.ai.TutoringAiService
+import com.xyj.focuspod.service.ai.TutoringSubtitle
 import com.xyj.focuspod.service.api.StudyPlanApi
 import com.xyj.focuspod.service.camera.CameraCaptureService
 import com.xyj.focuspod.service.device.DoorControlService
@@ -233,12 +234,22 @@ class StudyFlow(
                 override fun onStudentSpeech(text: String) {
                     if (isCurrentTutoringQuestion(questionId)) {
                         appendTutoringMessage(TutoringSpeaker.STUDENT, text)
-                        updateTutoringVoiceCaption(text)
+                        updateTutoringVoiceCaption(TutoringSpeaker.STUDENT, text)
                     }
                 }
 
                 override fun onCaption(text: String) {
-                    // Tutoring captions only show recognized student speech and AI replies.
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        appendTutoringMessage(TutoringSpeaker.AI, text)
+                        updateTutoringVoiceCaption(TutoringSpeaker.AI, text)
+                    }
+                }
+
+                override fun onSubtitle(subtitle: TutoringSubtitle) {
+                    if (isCurrentTutoringQuestion(questionId)) {
+                        appendTutoringMessage(subtitle.speaker, subtitle.text)
+                        updateTutoringVoiceCaption(subtitle.speaker, subtitle.text)
+                    }
                 }
 
                 override fun onError(message: String) {
@@ -439,11 +450,15 @@ class StudyFlow(
         return state.page == StudyPage.TUTORING && state.currentQuestion?.id == questionId
     }
 
-    private fun updateTutoringVoiceCaption(text: String) {
+    private fun updateTutoringVoiceCaption(speaker: TutoringSpeaker, text: String) {
         val cleanText = text.trim()
         if (cleanText.isEmpty()) return
 
-        update(state.copy(voiceCaption = "你说：$cleanText"))
+        val prefix = when (speaker) {
+            TutoringSpeaker.STUDENT -> "你说"
+            TutoringSpeaker.AI -> "AI"
+        }
+        update(state.copy(voiceCaption = "$prefix：$cleanText"))
     }
 
     private fun handleTutoringError(questionId: String, message: String) {

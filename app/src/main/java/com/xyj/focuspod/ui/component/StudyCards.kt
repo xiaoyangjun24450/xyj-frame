@@ -25,6 +25,7 @@ import com.xyj.focuspod.model.DeviceCheckStatus
 import com.xyj.focuspod.model.Question
 import com.xyj.focuspod.model.StudyPlan
 import com.xyj.focuspod.model.TutoringMessage
+import com.xyj.focuspod.model.TutoringSpeaker
 import com.xyj.focuspod.ui.theme.FocusPrimary
 import com.xyj.focuspod.ui.theme.FocusPrimarySoft
 import com.xyj.focuspod.ui.theme.FocusSuccess
@@ -125,10 +126,18 @@ fun VoiceRecordPanel(
                 Text(text = "等待学生提问。", style = MaterialTheme.typography.bodyLarge)
             } else {
                 messages.forEach { message ->
+                    val speakerText = when (message.speaker) {
+                        TutoringSpeaker.STUDENT -> "学生"
+                        TutoringSpeaker.AI -> "AI"
+                    }
+                    val textColor = when (message.speaker) {
+                        TutoringSpeaker.STUDENT -> MaterialTheme.colorScheme.primary
+                        TutoringSpeaker.AI -> MaterialTheme.colorScheme.onSurface
+                    }
                     Text(
-                        text = "学生：${message.text}",
+                        text = "$speakerText：${message.text}",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        color = textColor
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
