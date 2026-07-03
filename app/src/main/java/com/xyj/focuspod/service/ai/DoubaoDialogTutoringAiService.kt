@@ -8,7 +8,6 @@ import com.bytedance.speech.speechengine.SpeechEngine
 import com.bytedance.speech.speechengine.SpeechEngineDefines
 import com.bytedance.speech.speechengine.SpeechEngineGenerator
 import com.xyj.focuspod.model.Question
-import com.xyj.focuspod.model.QuestionSource
 import com.xyj.focuspod.model.StudyStage
 import com.xyj.focuspod.model.TutoringSpeaker
 import org.json.JSONArray
@@ -26,8 +25,11 @@ class DoubaoDialogTutoringAiService(
     private var engine: SpeechEngine? = null
     private var listener: TutoringAiListener? = null
     private var sessionStarted = false
-    private var pendingQuestionContext: PendingQuestionContext? = null
+    private var pendingOpeningQuestion: Question? = null
     private var lastAiCaption: String = ""
+    private val tutoringSystemRolePrompt: String by lazy { loadPromptAsset(TUTORING_SYSTEM_ROLE_PROMPT_ASSET_PATH) }
+    private val tutoringSpeakingStyle: String by lazy { loadPromptAsset(TUTORING_SPEAKING_STYLE_ASSET_PATH) }
+    private val tutoringOpeningPrompt: String by lazy { loadPromptAsset(TUTORING_OPENING_PROMPT_ASSET_PATH) }
 
     override fun startSession(
         stage: StudyStage,
@@ -35,7 +37,7 @@ class DoubaoDialogTutoringAiService(
         listener: TutoringAiListener
     ) {
         this.listener = listener
-        pendingQuestionContext = PendingQuestionContext(stage, question)
+        pendingOpeningQuestion = question
         if (!config.isReady()) {
             listener.onError("豆包语音参数未配置，请补充 APP ID 和 Access Token。")
             return
@@ -48,12 +50,20 @@ class DoubaoDialogTutoringAiService(
             "停止旧语音会话"
         ) ?: return
 
+        val dialogPayload = JSONObject()
+            .put("bot_name", config.botName)
+            .put("SubtitleConfig", subtitleConfigJson())
+        buildTutoringSystemRole(question).takeIf { it.isNotBlank() }?.let {
+            dialogPayload.put("system_role", it)
+        }
+        tutoringSpeakingStyle.takeIf { it.isNotBlank() }?.let {
+            dialogPayload.put("speaking_style", it)
+        }
+
         val startPayload = JSONObject()
             .put(
                 "dialog",
-                JSONObject()
-                    .put("bot_name", config.botName)
-                    .put("SubtitleConfig", subtitleConfigJson())
+                dialogPayload
             )
             .put("SubtitleConfig", subtitleConfigJson())
             .toString()
@@ -73,7 +83,7 @@ class DoubaoDialogTutoringAiService(
     override fun stopSession() {
         val currentEngine = engine ?: return
         sessionStarted = false
-        pendingQuestionContext = null
+        pendingOpeningQuestion = null
         lastAiCaption = ""
         currentEngine.sendDirective(SpeechEngineDefines.DIRECTIVE_SYNC_STOP_ENGINE, "")
         listener = null
@@ -82,7 +92,7 @@ class DoubaoDialogTutoringAiService(
     override fun release() {
         val currentEngine = engine ?: return
         sessionStarted = false
-        pendingQuestionContext = null
+        pendingOpeningQuestion = null
         lastAiCaption = ""
         listener = null
         currentEngine.destroyEngine()
@@ -109,10 +119,13 @@ class DoubaoDialogTutoringAiService(
                     }
                 }
 
-                SpeechEngineDefines.MESSAGE_TYPE_ENGINE_START,
+                SpeechEngineDefines.MESSAGE_TYPE_ENGINE_START -> {
+                    Unit
+                }
+
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_SESSION_STARTED,
                 SpeechEngineDefines.MESSAGE_TYPE_EVENT_SESSION_STARTED -> {
-                    sendPendingQuestionContext()
+                    sendPendingOpening()
                 }
 
                 SpeechEngineDefines.MESSAGE_TYPE_DIALOG_ASR_INFO,
@@ -273,44 +286,49 @@ class DoubaoDialogTutoringAiService(
         }.getOrNull()
     }
 
-    private fun sendQuestionContext(engine: SpeechEngine, stage: StudyStage, question: Question) {
-        val stageText = if (stage == StudyStage.EXAMPLE) "例题讲解" else "考试讲评"
-        val sourceText = if (question.source == QuestionSource.MISTAKE_REVIEW) "错题复盘" else "原始例题"
-        val content = buildString {
-            append("你是小学生学习辅导老师。")
-            append("当前阶段：").append(stageText).append("。")
-            append("题目来源：").append(sourceText).append("。")
-            append("题目标题：").append(question.title).append("。")
-            append("题干：").append(question.questionMarkdown).append("。")
-            append("考察知识点：").append(question.knowledgePoints.joinToString("、")).append("。")
-            append("辅导要求：").append(question.tutoringPrompt).append("。")
-            append("请用中文短句分步引导学生思考。")
-            append("只能提示读题、找条件、列关系式、检查单位和过程。")
-            append("不要直接给最终答案，也不要代写完整解题过程。")
+    private fun buildTutoringSystemRole(question: Question): String {
+        return renderPrompt(tutoringSystemRolePrompt, promptValues(question))
+    }
+
+    private fun loadPromptAsset(assetPath: String): String {
+        return runCatching {
+            context.assets.open(assetPath).use { input ->
+                input.bufferedReader(StandardCharsets.UTF_8).readText().trim()
+            }
+        }.getOrElse { error ->
+            Log.w(TAG, "Prompt asset is unavailable: $assetPath", error)
+            ""
         }
-        val ragItem = JSONObject()
-            .put("title", "当前辅导题目")
-            .put("content", content)
-        val payload = JSONObject()
-            .put("external_rag", "[$ragItem]")
-            .toString()
-        engine.sendChecked(
-            SpeechEngineDefines.DIRECTIVE_EVENT_CHAT_RAG_TEXT,
-            payload,
-            "发送题目上下文"
+    }
+
+    private fun renderPrompt(template: String, values: Map<String, String>): String {
+        return values.entries.fold(template) { result, (key, value) ->
+            result.replace("{{$key}}", value)
+        }.trim()
+    }
+
+    private fun promptValues(question: Question): Map<String, String> {
+        return mapOf(
+            "question_title" to question.title,
+            "question_markdown" to question.questionMarkdown,
+            "knowledge_points" to question.knowledgePoints.joinToString("、"),
+            "tutoring_prompt" to question.tutoringPrompt
         )
     }
 
-    private fun sendPendingQuestionContext() {
+    private fun sendPendingOpening() {
         val currentEngine = engine ?: return
-        val context = pendingQuestionContext ?: return
-        pendingQuestionContext = null
-        sendQuestionContext(currentEngine, context.stage, context.question)
-        sayHello(currentEngine, context.question)
+        val question = pendingOpeningQuestion ?: return
+        pendingOpeningQuestion = null
+        sayHello(currentEngine, question)
     }
 
     private fun sayHello(engine: SpeechEngine, question: Question) {
-        val content = "我们来看${question.title}。先读题，找出已知条件；你也可以直接说出卡住的地方。"
+        val content = renderPrompt(
+            tutoringOpeningPrompt,
+            mapOf("question_title" to question.title)
+        )
+        if (content.isBlank()) return
         val payload = JSONObject().put("content", content).toString()
         engine.sendChecked(
             SpeechEngineDefines.DIRECTIVE_EVENT_SAY_HELLO,
@@ -486,6 +504,9 @@ class DoubaoDialogTutoringAiService(
         private const val TAG = "DoubaoDialogTutoring"
         private const val AEC_MODEL_ASSET_PATH = "doubao/aec.model"
         private const val AEC_MODEL_FILE_PATH = "doubao/aec.model"
+        private const val TUTORING_SYSTEM_ROLE_PROMPT_ASSET_PATH = "prompts/tutoring_context_prompt.txt"
+        private const val TUTORING_SPEAKING_STYLE_ASSET_PATH = "prompts/tutoring_speaking_style.txt"
+        private const val TUTORING_OPENING_PROMPT_ASSET_PATH = "prompts/tutoring_opening_prompt.txt"
         private const val SUBTITLE_HEADER_SIZE = 8
         private const val SUBTITLE_MODE_FAST = 1
         private val OGG_MAGIC = byteArrayOf(0x4F, 0x67, 0x67, 0x53)
@@ -503,11 +524,6 @@ class DoubaoDialogTutoringAiService(
         private val EVENT_MESSAGE_TYPE_RANGE = 3000..3028
     }
 }
-
-private data class PendingQuestionContext(
-    val stage: StudyStage,
-    val question: Question
-)
 
 data class DoubaoDialogConfig(
     val appId: String,

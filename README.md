@@ -80,6 +80,22 @@ doubao.logLevel=WARN
 
 不配置 `doubao.appId`、`doubao.token` 时，辅导页会保留题目和本地引导文案，但语音会话会显示配置缺失提示。开启 AEC 时需要额外提供文档里的 `aec.model` 文件路径。
 
+## 豆包辅导会话使用方式
+
+```
+启动会话
+-> SESSION_STARTED
+-> 播放开场白 SayHello
+-> 后面就靠学生语音和 AI 对话继续
+```
+- App 在 `StartSession.dialog.system_role` 写入本题上下文和辅导规则。
+- `system_role` 包含阶段、题目来源、标题、题干、知识点、辅导要求和“不要直接给答案”等规则。
+- 固定辅导提示词从 `app/src/main/assets/prompts/` 下的 txt 文件读取。
+- `tutoring_context_prompt.txt` 渲染 `system_role`，`tutoring_speaking_style.txt` 渲染 `speaking_style`。
+- 新会话启动成功后，App 通过 `tutoring_opening_prompt.txt` 播放开场白，不再朗读完整题干。
+- 后面靠学生语音和 AI 对话继续。
+- 同一题停留期间不会反复设置上下文；切到下一题会重建会话并设置下一题上下文。
+
 ## WSL 真机调试
 
 WSL 里可以负责编译，真机连接和安装建议复用 Windows 侧的 `adb.exe`。这样不需要把 USB 设备挂进 WSL。[下载地址](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
