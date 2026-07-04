@@ -9,10 +9,10 @@ import com.xyj.focuspod.flow.StudyFlow
 import com.xyj.focuspod.mock.FakeCameraCaptureService
 import com.xyj.focuspod.mock.FakeDoorControlService
 import com.xyj.focuspod.mock.FakeGradingAiService
-import com.xyj.focuspod.mock.FakePoseDetector
 import com.xyj.focuspod.mock.MockStudyPlanApi
 import com.xyj.focuspod.service.ai.DoubaoDialogConfig
 import com.xyj.focuspod.service.ai.DoubaoDialogTutoringAiService
+import com.xyj.focuspod.service.sensor.AndroidPoseDetector
 
 class AppContainer(
     context: Context,
@@ -43,7 +43,7 @@ class AppContainer(
     val studyFlow = StudyFlow(
         handler = handler,
         studyPlanApi = MockStudyPlanApi(context.applicationContext, handler),
-        poseDetector = FakePoseDetector(handler),
+        poseDetector = AndroidPoseDetector(context.applicationContext, handler),
         cameraCaptureService = FakeCameraCaptureService(handler),
         tutoringAiService = tutoringAiService,
         gradingAiService = FakeGradingAiService(handler),

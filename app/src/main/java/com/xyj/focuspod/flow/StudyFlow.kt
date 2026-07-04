@@ -99,7 +99,10 @@ class StudyFlow(
         if (hasStartedCurrentPage) return
         hasStartedCurrentPage = true
         when (state.page) {
-            StudyPage.TUTORING -> startTutoringVoiceSession()
+            StudyPage.TUTORING -> {
+                startTutoringVoiceSession()
+                waitForFlipToGrade()
+            }
             StudyPage.EXAM -> waitForFlipToGrade()
             StudyPage.GRADING -> runGrading()
             StudyPage.GRADE_RESULT -> runResultCountdown()
@@ -109,6 +112,7 @@ class StudyFlow(
     }
 
     fun release() {
+        poseDetector.release()
         tutoringAiService.release()
     }
 
@@ -199,7 +203,12 @@ class StudyFlow(
 
     private fun waitForFlipToGrade() {
         val page = state.page
-        update(state.copy(voiceCaption = "系统正在等待手机翻转。"))
+        val caption = when (page) {
+            StudyPage.TUTORING -> "完成后请翻转手机开始批卷。"
+            StudyPage.EXAM -> "系统正在等待手机翻转。"
+            else -> state.voiceCaption
+        }
+        update(state.copy(voiceCaption = caption))
         poseDetector.waitForFlip {
             if (state.page == page) {
                 update(
@@ -497,6 +506,9 @@ class StudyFlow(
         val previousPage = state.page
         if (previousPage == StudyPage.TUTORING && newState.page != StudyPage.TUTORING) {
             tutoringAiService.stopSession()
+        }
+        if (previousPage != newState.page) {
+            poseDetector.cancel()
         }
         state = newState
         if (previousPage != newState.page) {
