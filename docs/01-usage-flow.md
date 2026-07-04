@@ -6,48 +6,48 @@
 ## 核心体验
 
 ```mermaid
-flowchart TD
-    start["学生打开 APP"]
-    splash["启动页显示品牌图案"]
-    plan["选择学习计划"]
-    lock["学生把手机放入手机仓并关闭仓门"]
-    check["设备自检：相机、麦克风、网络、姿态传感器、USB"]
+graph TD
+    app_open["学生打开 APP"]
+    start_page["启动页"]
+    plan_page["学习计划选择页"]
+    self_check_page["设备自检页"]
 
-    exampleStage["例题讲解阶段"]
-    tutorExample["辅导页：显示例题并语音讲解"]
-    gradeExample["批卷页：拍照、上传、AI 批改"]
-    resultExample["批卷结果页显示 10 秒"]
+    tutoring_page["辅导页：例题或错题辅导"]
+    exam_page["考试页：只显示题目"]
+    grading_prepare["批卷页：后摄预览，5 秒后拍照"]
+    grading_ai["上传图片，豆包多模态批改"]
+    wait_upright["提示翻回正面，等待手机竖直"]
+    result_page["批卷结果页：显示 10 秒"]
 
-    examStage["考试阶段"]
-    examPage["考试页：只显示题目"]
-    gradeExam["批卷页：拍照、上传、AI 批改"]
-    resultExam["批卷结果页显示 10 秒"]
+    score_page["考试成绩页"]
+    door_open["发送开门指令"]
+    door_opened["开门成功，学习完成"]
+    door_failed["开门失败，停留成绩页并提示联系老师"]
+    mistake_review["整理错题为复习题"]
 
-    done["完成开门页"]
-    unlock["发送开门指令"]
-    finish["手机仓打开，任务完成"]
+    app_open --> start_page
+    start_page -->|3 秒后| plan_page
+    plan_page -->|选择计划并开始| self_check_page
+    self_check_page -->|自检完成| tutoring_page
 
-    start --> splash
-    splash -->|3 秒后自动跳转| plan
-    plan --> lock
-    lock --> check
-    check -->|检查通过| exampleStage
+    tutoring_page -->|完成作答并翻转| grading_prepare
+    exam_page -->|完成作答并翻转| grading_prepare
+    grading_prepare -->|拍照成功| grading_ai
+    grading_prepare -->|拍照失败，自动重试| grading_prepare
+    grading_ai -->|批改失败，自动重试| grading_prepare
+    grading_ai -->|批改完成| wait_upright
+    wait_upright -->|手机竖直| result_page
 
-    exampleStage --> tutorExample
-    tutorExample -->|检测到手机翻转| gradeExample
-    gradeExample -->|批改完成并检测到翻回正面| resultExample
-    resultExample -->|例题未完成| tutorExample
-    resultExample -->|例题完成| examStage
+    result_page -->|例题未完成| tutoring_page
+    result_page -->|例题完成| exam_page
+    result_page -->|考试未完成| exam_page
+    result_page -->|考试完成| score_page
 
-    examStage --> examPage
-    examPage -->|检测到手机翻转| gradeExam
-    gradeExam -->|批改完成并检测到翻回正面| resultExam
-    resultExam -->|考试未完成| examPage
-    resultExam -->|考试完成且达标| done
-    resultExam -->|考试不达标，错题整理成新的例题| exampleStage
-
-    done --> unlock
-    unlock --> finish
+    score_page -->|达标| door_open
+    door_open -->|开门成功| door_opened
+    door_open -->|开门失败| door_failed
+    score_page -->|未达标，等待 10 秒| mistake_review
+    mistake_review --> tutoring_page
 ```
 
 ## 关键规则
@@ -55,11 +55,15 @@ flowchart TD
 - 手机锁进仓后，学生不能触摸屏幕。
 - 学习计划选择页是唯一主要触控页面。
 - 设备自检页之后，只靠语音提示、文字提示、手机翻转推进。
-- 考试不达标时，错题会整理成新的例题，回到例题讲解阶段。
+- 辅导页和考试页检测到 `a_z > 7` 稳定 3 秒后进入批卷页。
+- 批卷完成后检测到手机竖直，也就是 `|a_z| < 2` 后进入批卷结果页。
+- 考试平均分小于或等于学习计划的 `passScore` 时，会把本轮考试中分数小于或等于 `passScore` 的题整理成复习题，回到辅导页。
 - 考试页只显示题目，不显示讲解和答案。
-- 批卷页统一负责拍照、上传、AI 批改。
+- 批卷页显示后置摄像头预览，进入页面后等待 5 秒自动拍照，再上传给豆包多模态批改。
 - 批卷完成后，APP 语音和文字提示学生把手机翻回正面。
 - 批卷结果页停留 10 秒后自动进入下一步。
+- 考试成绩页按学习计划 `passScore` 判断达标；平均分大于 `passScore` 时发送开门指令，小于或等于时 10 秒后进入错题辅导。
+- 当前没有真实开门硬件配置时，开门服务会返回失败并停留在考试成绩页显示提示。
 - 异常只在当前页面显示提示层，不单独做异常页。
 
 ## MVP 边界

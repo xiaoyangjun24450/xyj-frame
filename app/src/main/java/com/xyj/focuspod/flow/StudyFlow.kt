@@ -1,8 +1,7 @@
 package com.xyj.focuspod.flow
 
 import android.os.Handler
-import com.xyj.focuspod.mock.RESULT_COUNTDOWN_SECONDS
-import com.xyj.focuspod.mock.START_DELAY_MS
+import android.view.TextureView
 import com.xyj.focuspod.model.DeviceCheckItem
 import com.xyj.focuspod.model.DeviceCheckStatus
 import com.xyj.focuspod.model.DoorStatus
@@ -24,6 +23,7 @@ import com.xyj.focuspod.service.api.StudyPlanApi
 import com.xyj.focuspod.service.camera.CameraCaptureService
 import com.xyj.focuspod.service.device.DoorControlService
 import com.xyj.focuspod.service.sensor.PoseDetector
+import com.xyj.focuspod.service.voice.VoicePromptService
 
 class StudyFlow(
     private val handler: Handler,
@@ -32,7 +32,8 @@ class StudyFlow(
     private val cameraCaptureService: CameraCaptureService,
     private val tutoringAiService: TutoringAiService,
     private val gradingAiService: GradingAiService,
-    private val doorControlService: DoorControlService
+    private val doorControlService: DoorControlService,
+    private val voicePromptService: VoicePromptService
 ) {
     private var state = StudySessionState()
     private val listeners = mutableSetOf<(StudySessionState) -> Unit>()
@@ -89,7 +90,8 @@ class StudyFlow(
                 voiceCaption = "请把手机放入手机仓并关闭仓门，系统开始自检。",
                 completedQuestionCount = 0,
                 mistakeCount = 0,
-                totalExamScore = 0
+                totalExamScore = 0,
+                examPassed = null
             )
         )
         runDeviceSelfCheck()
@@ -106,7 +108,7 @@ class StudyFlow(
             StudyPage.EXAM -> waitForFlipToGrade()
             StudyPage.GRADING -> runGrading()
             StudyPage.GRADE_RESULT -> runResultCountdown()
-            StudyPage.DONE -> runDoorOpen()
+            StudyPage.EXAM_SCORE -> runExamScorePage()
             else -> Unit
         }
     }
@@ -114,6 +116,12 @@ class StudyFlow(
     fun release() {
         poseDetector.release()
         tutoringAiService.release()
+        cameraCaptureService.release()
+        voicePromptService.release()
+    }
+
+    fun bindGradingCameraPreview(textureView: TextureView) {
+        cameraCaptureService.bindPreview(textureView)
     }
 
     private fun loadPlans() {
@@ -214,10 +222,12 @@ class StudyFlow(
                 update(
                     state.copy(
                         page = StudyPage.GRADING,
-                        gradingStep = GradingStep.CAPTURING,
-                        voiceCaption = "检测到翻转，开始拍摄并批改。"
+                        gradingStep = GradingStep.PREPARING,
+                        gradingCountdownSeconds = GRADING_PREPARE_SECONDS,
+                        voiceCaption = "检测到翻转，请保持手机稳定，不要遮挡试卷。"
                     )
                 )
+                voicePromptService.speak("请保持手机稳定，不要遮挡试卷。五秒后自动拍照。")
             }
         }
     }
@@ -272,6 +282,33 @@ class StudyFlow(
 
     private fun runGrading() {
         val question = state.currentQuestion ?: return
+        update(
+            state.copy(
+                gradingStep = GradingStep.PREPARING,
+                gradingCountdownSeconds = GRADING_PREPARE_SECONDS,
+                voiceCaption = "请保持手机稳定，不要遮挡试卷，答案完整放在画面中。"
+            )
+        )
+        for (second in GRADING_PREPARE_SECONDS downTo 1) {
+            handler.postDelayed({
+                if (state.page == StudyPage.GRADING && state.gradingStep == GradingStep.PREPARING) {
+                    update(
+                        state.copy(
+                            gradingCountdownSeconds = second,
+                            voiceCaption = "准备拍摄，请勿遮挡试卷，${second} 秒后自动拍照。"
+                        )
+                    )
+                }
+            }, (GRADING_PREPARE_SECONDS - second) * 1_000L)
+        }
+        handler.postDelayed({
+            if (state.page == StudyPage.GRADING && state.gradingStep == GradingStep.PREPARING) {
+                captureAndGrade(question)
+            }
+        }, GRADING_PREPARE_SECONDS * 1_000L)
+    }
+
+    private fun captureAndGrade(question: Question) {
         update(state.copy(gradingStep = GradingStep.CAPTURING, voiceCaption = "正在拍摄纸面答案，请保持手机稳定。"))
         cameraCaptureService.captureAnswer { captureResult ->
             captureResult.fold(
@@ -282,7 +319,14 @@ class StudyFlow(
                         gradingAiService.grade(state.stage, question, imagePath, examRound) { gradeResult ->
                             gradeResult.fold(
                                 onSuccess = { result -> waitForFaceUp(result) },
-                                onFailure = { update(state.copy(alertMessage = "AI 批改失败，系统将自动重试。")) }
+                                onFailure = { error ->
+                                    update(
+                                        state.copy(
+                                            alertMessage = "AI 批改失败，系统将自动重试。\n${error.message.orEmpty().take(MAX_ALERT_ERROR_LENGTH)}"
+                                        )
+                                    )
+                                    handler.postDelayed({ runGrading() }, 1_000L)
+                                }
                             )
                         }
                     }, 900L)
@@ -303,6 +347,7 @@ class StudyFlow(
                 voiceCaption = "批改完成，请把手机翻回正面。"
             )
         )
+        voicePromptService.speak("批改完成，请把手机翻回正面。")
         poseDetector.waitForFaceUp {
             update(
                 state.copy(
@@ -313,6 +358,7 @@ class StudyFlow(
                     voiceCaption = "本题结果已生成，10 秒后进入下一步。"
                 )
             )
+            voicePromptService.speak("本题结果已生成，十秒后进入下一步。")
         }
     }
 
@@ -351,25 +397,48 @@ class StudyFlow(
     private fun finishExamRound() {
         val plan = state.selectedPlan ?: return
         val averageScore = if (examResults.isEmpty()) 0 else examResults.sumOf { it.score } / examResults.size
-        val mistakes = examResults.filter { !it.passed }
-        if (averageScore >= plan.passScore && mistakes.isEmpty()) {
-            update(
-                state.copy(
-                    page = StudyPage.DONE,
-                    stage = StudyStage.EXAM,
-                    currentQuestion = null,
-                    remainingCount = 0,
-                    totalExamScore = averageScore,
-                    mistakeCount = 0,
-                    doorStatus = DoorStatus.OPENING,
-                    voiceCaption = "考试达标，学习完成，正在打开手机仓。"
-                )
+        val mistakes = examResults.filter { it.score <= plan.passScore }
+        val examPassed = averageScore > plan.passScore
+        val caption = if (examPassed) {
+            "考试成绩 ${averageScore} 分，已达标，正在打开手机仓。"
+        } else {
+            "考试成绩 ${averageScore} 分，未达标，10 秒后进入错题辅导。"
+        }
+        update(
+            state.copy(
+                page = StudyPage.EXAM_SCORE,
+                stage = StudyStage.EXAM,
+                currentQuestion = null,
+                remainingCount = 0,
+                totalExamScore = averageScore,
+                mistakeCount = mistakes.size,
+                examPassed = examPassed,
+                doorStatus = DoorStatus.OPENING,
+                voiceCaption = caption
             )
+        )
+        voicePromptService.speak(caption)
+    }
+
+    private fun runExamScorePage() {
+        val plan = state.selectedPlan ?: return
+        if (state.examPassed == true) {
+            runDoorOpen()
             return
         }
 
+        handler.postDelayed({
+            if (state.page == StudyPage.EXAM_SCORE && state.examPassed == false) {
+                enterMistakeReview(plan)
+            }
+        }, EXAM_SCORE_FAIL_DELAY_MS)
+    }
+
+    private fun enterMistakeReview(plan: StudyPlan) {
+        val mistakes = examResults.filter { it.score <= plan.passScore }
         activeStageQuestions = mistakes.mapIndexed { index, result ->
-            val original = plan.examQuestions.firstOrNull { it.id == result.questionId }
+            val original = activeStageQuestions.firstOrNull { it.id == result.questionId }
+                ?: plan.examQuestions.firstOrNull { it.id == result.questionId }
             Question(
                 id = "review-${examRound}-${index + 1}",
                 title = "错题讲解 ${index + 1}",
@@ -381,7 +450,7 @@ class StudyFlow(
                 gradingPrompt = original?.gradingPrompt ?: "检查学生是否修正了本题关键思路和计算过程。",
                 source = QuestionSource.MISTAKE_REVIEW
             )
-        }
+        }.ifEmpty { plan.examQuestions }
         exampleIndex = 0
         examIndex = 0
         examRound += 1
@@ -390,7 +459,7 @@ class StudyFlow(
             state.copy(
                 stage = StudyStage.EXAMPLE,
                 mistakeCount = activeStageQuestions.size,
-                totalExamScore = averageScore,
+                examPassed = null,
                 voiceCaption = "本轮考试未达标，错题已整理成新的例题。"
             )
         )
@@ -407,6 +476,7 @@ class StudyFlow(
                             voiceCaption = "手机仓已打开，本次学习完成。"
                         )
                     )
+                    voicePromptService.speak("手机仓已打开，本次学习完成。")
                 },
                 onFailure = {
                     update(
@@ -416,6 +486,7 @@ class StudyFlow(
                             voiceCaption = "开门失败，请联系老师或工作人员。"
                         )
                     )
+                    voicePromptService.speak("开门失败，请联系老师或工作人员。")
                 }
             )
         }
@@ -520,6 +591,11 @@ class StudyFlow(
     private companion object {
         const val MAX_TUTORING_MESSAGES = 6
         const val MAX_TUTORING_RETRY_COUNT = 2
+        const val START_DELAY_MS = 3_000L
+        const val RESULT_COUNTDOWN_SECONDS = 10
         const val TUTORING_RETRY_DELAY_MS = 1_500L
+        const val GRADING_PREPARE_SECONDS = 5
+        const val EXAM_SCORE_FAIL_DELAY_MS = 10_000L
+        const val MAX_ALERT_ERROR_LENGTH = 120
     }
 }

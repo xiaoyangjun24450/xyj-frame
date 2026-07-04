@@ -80,6 +80,22 @@ doubao.logLevel=WARN
 
 不配置 `doubao.appId`、`doubao.token` 时，辅导页会保留题目和本地引导文案，但语音会话会显示配置缺失提示。开启 AEC 时需要额外提供文档里的 `aec.model` 文件路径。
 
+## 豆包多模态批卷配置
+
+批卷页使用后置摄像头预览，翻转进入批卷页后等待 5 秒自动拍照。配置豆包多模态参数后，App 会按 Responses API 把答案图片、题干、标准答案和批卷提示词发送给模型；未配置时批卷会失败并提示配置缺失。
+
+接口触发条件、请求结构和返回示例见 [大模型接口设计](docs/05-llm-api-design.md)。
+
+建议写入本机 `local.properties`：
+
+```properties
+doubao.multimodal.apiKey=你的火山方舟 API Key
+doubao.multimodal.model=你的多模态模型或 Endpoint ID
+doubao.multimodal.endpoint=https://ark.cn-beijing.volces.com/api/v3/responses
+```
+
+图片按文档使用 `input_image.image_url`，传入 `data:image/jpeg;base64,...` 形式；输出使用 `text.format.type=json_schema`，字段为 `score`、`feedback`、`reason`、`suggestion`。
+
 ## 豆包辅导会话使用方式
 
 ```

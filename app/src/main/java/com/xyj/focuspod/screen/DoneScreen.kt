@@ -18,6 +18,8 @@ fun DoneScreen(state: StudySessionState) {
         Column(modifier = Modifier.fillMaxWidth()) {
             DoorStatusPanel(
                 totalExamScore = state.totalExamScore,
+                passScore = state.selectedPlan?.passScore ?: 0,
+                examPassed = state.examPassed,
                 completedQuestionCount = state.completedQuestionCount,
                 mistakeCount = state.mistakeCount,
                 doorStatus = state.doorStatus

@@ -18,6 +18,7 @@ class UiTextTest {
 
     @Test
     fun gradingStepTextShowsCurrentProgress() {
+        assertEquals("准备拍摄\n5 秒后自动拍照", gradingStepText(GradingStep.PREPARING, 5))
         assertEquals("正在拍摄", gradingStepText(GradingStep.CAPTURING))
         assertEquals("正在上传", gradingStepText(GradingStep.UPLOADING))
         assertEquals("正在批改", gradingStepText(GradingStep.GRADING))

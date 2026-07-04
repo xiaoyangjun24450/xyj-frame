@@ -6,7 +6,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
-import android.util.Log
 
 class AndroidPoseDetector(
     context: Context,
@@ -29,7 +28,7 @@ class AndroidPoseDetector(
     }
 
     override fun waitForFaceUp(callback: () -> Unit) {
-        waitForPose(DevicePose.SCREEN_DOWN, callback)
+        waitForPose(DevicePose.UPRIGHT, callback)
     }
 
     override fun cancel() {
@@ -67,12 +66,7 @@ class AndroidPoseDetector(
         this.callback = callback
         stabilityDetector.reset()
 
-        val sensor = poseSensor
-        if (sensor == null) {
-            Log.w(TAG, "No gravity or accelerometer sensor found; triggering $pose without IMU data.")
-            triggerWithoutSensor(callback)
-            return
-        }
+        val sensor = poseSensor ?: return cancel()
 
         isListening = sensorManager.registerListener(
             this,
@@ -81,8 +75,7 @@ class AndroidPoseDetector(
             handler
         )
         if (!isListening) {
-            Log.w(TAG, "Failed to register pose sensor; triggering $pose without IMU data.")
-            triggerWithoutSensor(callback)
+            cancel()
         }
     }
 
@@ -100,13 +93,7 @@ class AndroidPoseDetector(
         return filteredZAcceleration
     }
 
-    private fun triggerWithoutSensor(callback: () -> Unit) {
-        cancel()
-        handler.post(callback)
-    }
-
     private companion object {
-        const val TAG = "AndroidPoseDetector"
         const val Z_AXIS = 2
         const val LOW_PASS_ALPHA = 0.8f
     }

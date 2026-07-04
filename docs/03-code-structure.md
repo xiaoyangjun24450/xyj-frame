@@ -54,7 +54,6 @@ app/src/main/java/com/xyj/focuspod/
 │   ├── storage/
 │   └── usb/
 ├── repository/
-├── mock/
 └── util/
 ```
 
@@ -70,7 +69,7 @@ TutoringScreen.kt           辅导页，例题和错题整理后的新例题共�
 ExamScreen.kt               考试页，只显示题目
 GradingScreen.kt            批卷页，显示拍摄画面和批改状态
 GradeResultScreen.kt        批卷结果页，10 秒后自动跳转
-DoneScreen.kt               完成开门页
+DoneScreen.kt               考试成绩页，达标后显示开门状态，不达标后进入错题辅导
 ```
 
 页面 3 以后不设计触控按钮，页面只能展示状态、语音字幕、姿态提示和异常提示层。
@@ -113,7 +112,7 @@ enum class StudyPage {
     EXAM,
     GRADING,
     GRADE_RESULT,
-    DONE
+    EXAM_SCORE
 }
 
 enum class StudyStage {
@@ -127,7 +126,7 @@ enum class StudyStage {
 - 错题不单独做页面阶段。
 - 考试不达标后，把错题整理成新的例题，回到 `EXAMPLE`。
 - `StudyFlow` 只关心当前页面、当前阶段、当前题、批卷结果和考试结果。
-- 第一阶段所有“检测条件”先用 5 秒模拟实现。
+- 姿态、相机和批卷链路使用真实实现；开门服务未配置时明确返回失败。
 
 ## 核心数据
 
@@ -160,36 +159,16 @@ data class StudyPlan(
 先定义接口，再逐步替换实现。
 
 ```text
-api/StudyPlanApi.kt              获取学习计划，第一阶段本地写死一条
-ai/TutoringAiService.kt          辅导页 AI 语音交互，后续接豆包大模型
-ai/GradingAiService.kt           图片批卷，后续接豆包大模型
-sensor/PoseDetector.kt           IMU 翻转检测，第一阶段 5 秒后触发
-camera/CameraCaptureService.kt   后置摄像头和拍照，第一阶段 5 秒后返回假图片
-usb/DoorControlService.kt        USB 开门，第一阶段 5 秒后返回成功
+api/StudyPlanApi.kt              获取学习计划
+data/AssetStudyPlanApi.kt        从 assets/study_plans.json 读取本地学习计划
+ai/TutoringAiService.kt          辅导页 AI 语音交互
+ai/GradingAiService.kt           图片批卷，接入豆包多模态
+sensor/PoseDetector.kt           IMU 姿态检测
+camera/CameraCaptureService.kt   后置摄像头预览和拍照
+device/DoorControlService.kt     开门指令接口，未配置时返回失败
 interaction/VoiceService.kt      语音播报和语音识别
 storage/SessionStorage.kt        保存上次学习位置和本次学习记录
 ```
-
-## 模拟实现
-
-```text
-mock/MockStudyPlanApi.kt
-mock/FakePoseDetector.kt
-mock/FakeCameraCaptureService.kt
-mock/FakeTutoringAiService.kt
-mock/FakeGradingAiService.kt
-mock/FakeDoorControlService.kt
-```
-
-模拟规则：
-
-- 学习计划：本地写死一条计划。
-- 页面 1：3 秒后跳转。
-- 设备自检：5 秒后通过。
-- 翻转检测：5 秒后触发。
-- 批卷：5 秒后返回固定结果。
-- 批卷完成后翻回正面：5 秒后触发。
-- 开门：5 秒后返回成功。
 
 ## 后端接口预留
 

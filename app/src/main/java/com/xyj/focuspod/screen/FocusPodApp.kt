@@ -20,9 +20,9 @@ fun FocusPodApp(state: StudySessionState, flow: StudyFlow) {
             StudyPage.DEVICE_SELF_CHECK -> DeviceSelfCheckScreen(state)
             StudyPage.TUTORING -> TutoringScreen(state)
             StudyPage.EXAM -> ExamScreen(state)
-            StudyPage.GRADING -> GradingScreen(state)
+            StudyPage.GRADING -> GradingScreen(state, flow)
             StudyPage.GRADE_RESULT -> GradeResultScreen(state)
-            StudyPage.DONE -> DoneScreen(state)
+            StudyPage.EXAM_SCORE -> DoneScreen(state)
         }
     }
 }

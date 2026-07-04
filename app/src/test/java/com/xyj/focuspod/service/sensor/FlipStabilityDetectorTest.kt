@@ -12,7 +12,17 @@ class FlipStabilityDetectorTest {
 
         assertEquals(DevicePose.CAMERA_BACK_DOWN, detector.detectPose(8.2f))
         assertEquals(DevicePose.SCREEN_DOWN, detector.detectPose(-8.2f))
-        assertEquals(DevicePose.UNKNOWN, detector.detectPose(2.0f))
+        assertEquals(DevicePose.UPRIGHT, detector.detectPose(1.8f))
+        assertEquals(DevicePose.UPRIGHT, detector.detectPose(-1.8f))
+    }
+
+    @Test
+    fun updateTriggersForUprightWhenZAxisIsNearZero() {
+        val detector = FlipStabilityDetector(stableDurationMs = 800L)
+
+        assertFalse(detector.update(1.5f, timestampMs = 1_000L, targetPose = DevicePose.UPRIGHT))
+        assertFalse(detector.update(1.5f, timestampMs = 1_500L, targetPose = DevicePose.UPRIGHT))
+        assertTrue(detector.update(1.5f, timestampMs = 1_800L, targetPose = DevicePose.UPRIGHT))
     }
 
     @Test
@@ -22,6 +32,15 @@ class FlipStabilityDetectorTest {
         assertFalse(detector.update(8.0f, timestampMs = 1_000L, targetPose = DevicePose.CAMERA_BACK_DOWN))
         assertFalse(detector.update(8.0f, timestampMs = 1_500L, targetPose = DevicePose.CAMERA_BACK_DOWN))
         assertTrue(detector.update(8.0f, timestampMs = 1_800L, targetPose = DevicePose.CAMERA_BACK_DOWN))
+    }
+
+    @Test
+    fun defaultStabilityRequiresThreeSeconds() {
+        val detector = FlipStabilityDetector()
+
+        assertFalse(detector.update(8.0f, timestampMs = 1_000L, targetPose = DevicePose.CAMERA_BACK_DOWN))
+        assertFalse(detector.update(8.0f, timestampMs = 3_900L, targetPose = DevicePose.CAMERA_BACK_DOWN))
+        assertTrue(detector.update(8.0f, timestampMs = 4_000L, targetPose = DevicePose.CAMERA_BACK_DOWN))
     }
 
     @Test

@@ -53,6 +53,13 @@ android {
         buildConfigField("String", "DOUBAO_RECORDER_PATH", configValue("doubao.recorderPath").asBuildConfigString())
         buildConfigField("String", "DOUBAO_PLAYER_PATH", configValue("doubao.playerPath").asBuildConfigString())
         buildConfigField("String", "DOUBAO_LOG_LEVEL", configValue("doubao.logLevel", "WARN").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_MULTIMODAL_API_KEY", configValue("doubao.multimodal.apiKey").asBuildConfigString())
+        buildConfigField("String", "DOUBAO_MULTIMODAL_MODEL", configValue("doubao.multimodal.model").asBuildConfigString())
+        buildConfigField(
+            "String",
+            "DOUBAO_MULTIMODAL_ENDPOINT",
+            configValue("doubao.multimodal.endpoint", "https://ark.cn-beijing.volces.com/api/v3/responses").asBuildConfigString()
+        )
     }
 
     buildTypes {

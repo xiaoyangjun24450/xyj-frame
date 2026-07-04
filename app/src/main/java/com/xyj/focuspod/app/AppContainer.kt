@@ -5,14 +5,16 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import com.xyj.focuspod.BuildConfig
+import com.xyj.focuspod.data.AssetStudyPlanApi
 import com.xyj.focuspod.flow.StudyFlow
-import com.xyj.focuspod.mock.FakeCameraCaptureService
-import com.xyj.focuspod.mock.FakeDoorControlService
-import com.xyj.focuspod.mock.FakeGradingAiService
-import com.xyj.focuspod.mock.MockStudyPlanApi
 import com.xyj.focuspod.service.ai.DoubaoDialogConfig
 import com.xyj.focuspod.service.ai.DoubaoDialogTutoringAiService
+import com.xyj.focuspod.service.ai.DoubaoMultimodalConfig
+import com.xyj.focuspod.service.ai.DoubaoMultimodalGradingAiService
+import com.xyj.focuspod.service.camera.Camera2CaptureService
+import com.xyj.focuspod.service.device.UnconfiguredDoorControlService
 import com.xyj.focuspod.service.sensor.AndroidPoseDetector
+import com.xyj.focuspod.service.voice.AndroidTextToSpeechPromptService
 
 class AppContainer(
     context: Context,
@@ -39,14 +41,30 @@ class AppContainer(
         ),
         handler = handler
     )
+    private val cameraCaptureService = Camera2CaptureService(
+        context = context.applicationContext,
+        handler = handler
+    )
+    private val voicePromptService = AndroidTextToSpeechPromptService(context.applicationContext)
+    private val gradingAiService = DoubaoMultimodalGradingAiService(
+        context = context.applicationContext,
+        config = DoubaoMultimodalConfig(
+            apiKey = BuildConfig.DOUBAO_MULTIMODAL_API_KEY,
+            model = BuildConfig.DOUBAO_MULTIMODAL_MODEL,
+            endpoint = BuildConfig.DOUBAO_MULTIMODAL_ENDPOINT
+        ),
+        handler = handler
+    )
 
     val studyFlow = StudyFlow(
         handler = handler,
-        studyPlanApi = MockStudyPlanApi(context.applicationContext, handler),
+        studyPlanApi = AssetStudyPlanApi(context.applicationContext, handler),
         poseDetector = AndroidPoseDetector(context.applicationContext, handler),
-        cameraCaptureService = FakeCameraCaptureService(handler),
+        cameraCaptureService = cameraCaptureService,
         tutoringAiService = tutoringAiService,
-        gradingAiService = FakeGradingAiService(handler),
-        doorControlService = FakeDoorControlService(handler)
+        gradingAiService = gradingAiService,
+        doorControlService = UnconfiguredDoorControlService(handler),
+        voicePromptService = voicePromptService
     )
+
 }

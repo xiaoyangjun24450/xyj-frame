@@ -21,10 +21,10 @@ class MainActivity : ComponentActivity() {
     private val observer: (StudySessionState) -> Unit = { state ->
         currentState.value = state
     }
-    private val audioPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        // StudyFlow surfaces SDK permission failures in the tutoring page if permission is denied.
+        // StudyFlow surfaces permission failures in the relevant page if permission is denied.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
                 flow = studyFlow
             )
         }
-        requestAudioPermissionIfNeeded()
+        requestRuntimePermissionsIfNeeded()
         studyFlow.start()
     }
 
@@ -59,11 +59,15 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun requestAudioPermissionIfNeeded() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    private fun requestRuntimePermissionsIfNeeded() {
+        val missingPermissions = listOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.CAMERA
+        ).filter { permission ->
+            ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missingPermissions.isNotEmpty()) {
+            permissionLauncher.launch(missingPermissions.toTypedArray())
         }
     }
 }

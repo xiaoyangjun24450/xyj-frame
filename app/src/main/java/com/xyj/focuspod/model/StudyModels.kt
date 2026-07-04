@@ -8,7 +8,7 @@ enum class StudyPage {
     EXAM,
     GRADING,
     GRADE_RESULT,
-    DONE
+    EXAM_SCORE
 }
 
 enum class StudyStage {
@@ -47,8 +47,9 @@ data class GradeResult(
     val questionId: String,
     val stage: StudyStage,
     val score: Int,
-    val passed: Boolean,
-    val feedback: String
+    val feedback: String,
+    val reason: String = "",
+    val suggestion: String = ""
 )
 
 enum class TutoringSpeaker {
@@ -74,6 +75,7 @@ data class DeviceCheckItem(
 )
 
 enum class GradingStep {
+    PREPARING,
     CAPTURING,
     UPLOADING,
     GRADING,
@@ -100,10 +102,12 @@ data class StudySessionState(
     val deviceChecks: List<DeviceCheckItem> = emptyList(),
     val voiceCaption: String = "",
     val tutoringMessages: List<TutoringMessage> = emptyList(),
-    val gradingStep: GradingStep = GradingStep.CAPTURING,
+    val gradingStep: GradingStep = GradingStep.PREPARING,
+    val gradingCountdownSeconds: Int = 10,
     val resultCountdownSeconds: Int = 10,
     val doorStatus: DoorStatus = DoorStatus.OPENING,
     val totalExamScore: Int = 0,
+    val examPassed: Boolean? = null,
     val completedQuestionCount: Int = 0,
     val mistakeCount: Int = 0
 )

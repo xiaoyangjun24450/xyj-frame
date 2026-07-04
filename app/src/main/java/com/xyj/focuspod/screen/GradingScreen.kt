@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.xyj.focuspod.flow.StudyFlow
 import com.xyj.focuspod.model.StudySessionState
 import com.xyj.focuspod.ui.component.AppScaffold
 import com.xyj.focuspod.ui.component.GradingCameraPanel
@@ -16,13 +17,15 @@ import com.xyj.focuspod.ui.component.VoiceCaptionBar
 import com.xyj.focuspod.ui.component.stageText
 
 @Composable
-fun GradingScreen(state: StudySessionState) {
+fun GradingScreen(state: StudySessionState, flow: StudyFlow) {
     AppScaffold(alertMessage = state.alertMessage, scrollable = false) {
         Column(modifier = Modifier.fillMaxSize()) {
             StageTopBar(stageText = stageText(state.stage), remainingText = "剩余 ${state.remainingCount} 题")
             Spacer(modifier = Modifier.height(16.dp))
             GradingCameraPanel(
                 step = state.gradingStep,
+                countdownSeconds = state.gradingCountdownSeconds,
+                onPreviewReady = flow::bindGradingCameraPreview,
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.height(16.dp))
