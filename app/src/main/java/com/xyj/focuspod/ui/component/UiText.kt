@@ -3,6 +3,9 @@ package com.xyj.focuspod.ui.component
 import com.xyj.focuspod.model.DoorStatus
 import com.xyj.focuspod.model.GradingStep
 import com.xyj.focuspod.model.StudyStage
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.round
 
 fun stageText(stage: StudyStage): String {
     return when (stage) {
@@ -26,5 +29,14 @@ fun doorStatusText(status: DoorStatus): String {
         DoorStatus.OPENING -> "正在开门"
         DoorStatus.OPENED -> "开门成功"
         DoorStatus.FAILED -> "开门失败"
+    }
+}
+
+fun scoreText(score: Double): String {
+    val rounded = round(score * 10.0) / 10.0
+    return if (abs(rounded % 1.0) < 0.0001) {
+        rounded.toInt().toString()
+    } else {
+        String.format(Locale.US, "%.1f", rounded)
     }
 }

@@ -226,7 +226,7 @@ doubao.multimodal.endpoint=https://ark.cn-beijing.volces.com/api/v3/responses
 ```json
 {
   "model": "doubao-seed-2-0-mini-260428",
-  "instructions": "你是严谨的小学作业批改老师。请结合学生纸面答案图片、题干、标准答案和本题批卷要求进行批改。\n\n批改规则：\n1. 只根据图片中能看清的学生作答批改，不要臆测被遮挡或看不清的内容。\n2. 分数为 0 到 100 的整数。\n3. 反馈要面向学生，中文短句，最多 2 句话。\n4. 批改依据要简洁说明关键判断点。\n5. 下一步建议要给出一个具体可执行的改进方向。\n6. 不返回 pass、passed、是否通过等字段。\n\n请严格按请求中的 JSON Schema 返回。",
+  "instructions": "你是严谨的小学作业批改老师。请结合学生纸面答案图片、题干、标准答案和本题批卷要求进行批改。\n\n批改规则：\n1. 只根据图片中能看清的学生作答批改，不要臆测被遮挡或看不清的内容。\n2. 请按请求中的“本题满分”给分，分数必须在 0 到本题满分之间，可以是小数。\n3. 学生最终答案与标准答案等价且符合题意时，直接给本题满分，不要因为步骤不够详细扣分。\n4. 学生最终答案错误、缺失或与题意不符时，不得给满分；结合能看清的列式、关键步骤、单位和方法给过程分。\n5. 反馈要面向学生，中文短句，最多 2 句话。\n6. 批改依据要简洁说明关键判断点，尤其说明答案是否正确。\n7. 下一步建议要给出一个具体可执行的改进方向。\n8. 不返回 pass、passed、是否通过等字段。\n\n请严格按请求中的 JSON Schema 返回。",
   "input": [
     {
       "role": "user",
@@ -234,7 +234,7 @@ doubao.multimodal.endpoint=https://ark.cn-beijing.volces.com/api/v3/responses
       "content": [
         {
           "type": "input_text",
-          "text": "当前阶段：EXAMPLE\n考试轮次：1\n题目标题：例题：分数应用题\n题干：一根绳子长 **24 米**，用去了 $\\frac{1}{3}$。还剩多少米？\n标准答案：16 米\n本题批卷要求：检查学生是否先算出用去 8 米，再算出剩余 16 米，并注意单位。"
+          "text": "当前阶段：EXAMPLE\n考试轮次：1\n题目标题：例题：分数应用题\n题干：一根绳子长 **24 米**，用去了 $\\frac{1}{3}$。还剩多少米？\n标准答案：16 米\n本题满分：100 分\n本题批卷要求：检查学生是否先算出用去 8 米，再算出剩余 16 米，并注意单位。"
         },
         {
           "type": "input_image",
@@ -258,7 +258,7 @@ doubao.multimodal.endpoint=https://ark.cn-beijing.volces.com/api/v3/responses
         "type": "object",
         "properties": {
           "score": {
-            "type": "integer",
+            "type": "number",
             "minimum": 0,
             "maximum": 100
           },
@@ -310,7 +310,7 @@ App 会从以下位置读取模型输出文本：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `score` | integer | 0 到 100 的整数分数 |
+| `score` | number | 0 到本题满分之间的分数，可以是小数 |
 | `feedback` | string | 面向学生的简短反馈，最多 2 句话 |
 | `reason` | string | 批改依据，说明关键判断点 |
 | `suggestion` | string | 下一步可执行建议 |
@@ -321,7 +321,7 @@ App 会从以下位置读取模型输出文本：
 pass, passed, isPassed, 是否通过
 ```
 
-是否通过由考试成绩页根据学习计划 `passScore` 统一判断：考试平均分大于 `passScore` 才达标。
+是否通过由考试成绩页根据学习计划 `passScore` 统一判断：考试总分达到 `passScore` 才达标。考试总分为本轮考试各题得分相加；每题满分为 `100 / 本轮考试题目数量`；考试题未拿到本题满分时视为错题。错题辅导后只重考这些错题对应的原考试题。
 
 ### 返回示例
 
@@ -342,7 +342,7 @@ pass, passed, isPassed, 是否通过
       "content": [
         {
           "type": "output_text",
-          "text": "{\"score\":92,\"feedback\":\"步骤比较完整，答案正确。单位也写清楚了。\",\"reason\":\"学生先算出用去 8 米，再算出剩余 16 米，关键关系和结果正确。\",\"suggestion\":\"继续保持列式清楚，最后检查单位。\"}"
+          "text": "{\"score\":100,\"feedback\":\"答案正确，单位也写清楚了。\",\"reason\":\"学生算出剩余 16 米，最终答案与标准答案一致。\",\"suggestion\":\"继续保持最后检查单位的习惯。\"}"
         }
       ]
     }
@@ -356,10 +356,10 @@ App 解析后的业务结果：
 {
   "questionId": "example-001",
   "stage": "EXAMPLE",
-  "score": 92,
-  "feedback": "步骤比较完整，答案正确。单位也写清楚了。",
-  "reason": "学生先算出用去 8 米，再算出剩余 16 米，关键关系和结果正确。",
-  "suggestion": "继续保持列式清楚，最后检查单位。"
+  "score": 100,
+  "feedback": "答案正确，单位也写清楚了。",
+  "reason": "学生算出剩余 16 米，最终答案与标准答案一致。",
+  "suggestion": "继续保持最后检查单位的习惯。"
 }
 ```
 
@@ -376,5 +376,5 @@ App 解析后的业务结果：
 成功解析后，App 只在 logcat 输出最终用于业务的 JSON：
 
 ```text
-Doubao grading result JSON={"score":92,"feedback":"步骤比较完整，答案正确。单位也写清楚了。","reason":"学生先算出用去 8 米，再算出剩余 16 米，关键关系和结果正确。","suggestion":"继续保持列式清楚，最后检查单位。"}
+Doubao grading result JSON={"score":100,"feedback":"答案正确，单位也写清楚了。","reason":"学生算出剩余 16 米，最终答案与标准答案一致。","suggestion":"继续保持最后检查单位的习惯。"}
 ```

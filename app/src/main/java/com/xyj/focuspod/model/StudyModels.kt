@@ -46,10 +46,11 @@ data class StudyPlan(
 data class GradeResult(
     val questionId: String,
     val stage: StudyStage,
-    val score: Int,
+    val score: Double,
     val feedback: String,
     val reason: String = "",
-    val suggestion: String = ""
+    val suggestion: String = "",
+    val maxScore: Double = 100.0
 )
 
 enum class TutoringSpeaker {
@@ -106,7 +107,7 @@ data class StudySessionState(
     val gradingCountdownSeconds: Int = 10,
     val resultCountdownSeconds: Int = 10,
     val doorStatus: DoorStatus = DoorStatus.OPENING,
-    val totalExamScore: Int = 0,
+    val totalExamScore: Double = 0.0,
     val examPassed: Boolean? = null,
     val completedQuestionCount: Int = 0,
     val mistakeCount: Int = 0

@@ -24,6 +24,9 @@ import com.xyj.focuspod.service.camera.CameraCaptureService
 import com.xyj.focuspod.service.device.DoorControlService
 import com.xyj.focuspod.service.sensor.PoseDetector
 import com.xyj.focuspod.service.voice.VoicePromptService
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.round
 
 class StudyFlow(
     private val handler: Handler,
@@ -38,6 +41,7 @@ class StudyFlow(
     private var state = StudySessionState()
     private val listeners = mutableSetOf<(StudySessionState) -> Unit>()
     private var activeStageQuestions: List<Question> = emptyList()
+    private var examRoundQuestions: List<Question> = emptyList()
     private var exampleIndex = 0
     private var examIndex = 0
     private var examRound = 1
@@ -72,6 +76,7 @@ class StudyFlow(
 
     fun selectPlan(plan: StudyPlan) {
         activeStageQuestions = plan.exampleQuestions
+        examRoundQuestions = plan.examQuestions
         exampleIndex = 0
         examIndex = 0
         examRound = 1
@@ -90,7 +95,7 @@ class StudyFlow(
                 voiceCaption = "请把手机放入手机仓并关闭仓门，系统开始自检。",
                 completedQuestionCount = 0,
                 mistakeCount = 0,
-                totalExamScore = 0,
+                totalExamScore = 0.0,
                 examPassed = null
             )
         )
@@ -190,7 +195,10 @@ class StudyFlow(
 
     private fun enterExamQuestion() {
         val plan = state.selectedPlan ?: return
-        activeStageQuestions = plan.examQuestions
+        if (examRoundQuestions.isEmpty()) {
+            examRoundQuestions = plan.examQuestions
+        }
+        activeStageQuestions = examRoundQuestions
         val question = activeStageQuestions.getOrNull(examIndex)
         if (question == null) {
             finishExamRound()
@@ -316,7 +324,13 @@ class StudyFlow(
                     update(state.copy(gradingStep = GradingStep.UPLOADING, voiceCaption = "答案已拍摄，正在上传。"))
                     handler.postDelayed({
                         update(state.copy(gradingStep = GradingStep.GRADING, voiceCaption = "上传完成，AI 正在批改。"))
-                        gradingAiService.grade(state.stage, question, imagePath, examRound) { gradeResult ->
+                        gradingAiService.grade(
+                            stage = state.stage,
+                            question = question,
+                            imagePath = imagePath,
+                            examRound = examRound,
+                            questionMaxScore = currentQuestionMaxScore()
+                        ) { gradeResult ->
                             gradeResult.fold(
                                 onSuccess = { result -> waitForFaceUp(result) },
                                 onFailure = { error ->
@@ -396,13 +410,13 @@ class StudyFlow(
 
     private fun finishExamRound() {
         val plan = state.selectedPlan ?: return
-        val averageScore = if (examResults.isEmpty()) 0 else examResults.sumOf { it.score } / examResults.size
-        val mistakes = examResults.filter { it.score <= plan.passScore }
-        val examPassed = averageScore > plan.passScore
+        val totalScore = ExamScoring.totalScore(examResults)
+        val mistakes = ExamScoring.mistakes(examResults)
+        val examPassed = ExamScoring.isPassed(totalScore, plan.passScore)
         val caption = if (examPassed) {
-            "考试成绩 ${averageScore} 分，已达标，正在打开手机仓。"
+            "考试成绩 ${scoreText(totalScore)} 分，已达标，正在打开手机仓。"
         } else {
-            "考试成绩 ${averageScore} 分，未达标，10 秒后进入错题辅导。"
+            "考试成绩 ${scoreText(totalScore)} 分，未达标，10 秒后进入错题辅导。"
         }
         update(
             state.copy(
@@ -410,7 +424,7 @@ class StudyFlow(
                 stage = StudyStage.EXAM,
                 currentQuestion = null,
                 remainingCount = 0,
-                totalExamScore = averageScore,
+                totalExamScore = totalScore,
                 mistakeCount = mistakes.size,
                 examPassed = examPassed,
                 doorStatus = DoorStatus.OPENING,
@@ -435,10 +449,16 @@ class StudyFlow(
     }
 
     private fun enterMistakeReview(plan: StudyPlan) {
-        val mistakes = examResults.filter { it.score <= plan.passScore }
-        activeStageQuestions = mistakes.mapIndexed { index, result ->
-            val original = activeStageQuestions.firstOrNull { it.id == result.questionId }
+        val previousExamQuestions = activeStageQuestions
+        val mistakes = ExamScoring.mistakes(examResults)
+        val mistakesWithOriginals = mistakes.map { result ->
+            val original = previousExamQuestions.firstOrNull { it.id == result.questionId }
                 ?: plan.examQuestions.firstOrNull { it.id == result.questionId }
+            result to original
+        }
+        examRoundQuestions = mistakesWithOriginals.mapNotNull { it.second }
+            .ifEmpty { previousExamQuestions.ifEmpty { plan.examQuestions } }
+        activeStageQuestions = mistakesWithOriginals.mapIndexed { index, (result, original) ->
             Question(
                 id = "review-${examRound}-${index + 1}",
                 title = "错题讲解 ${index + 1}",
@@ -464,6 +484,14 @@ class StudyFlow(
             )
         )
         handler.postDelayed({ enterExampleQuestion() }, 800L)
+    }
+
+    private fun currentQuestionMaxScore(): Double {
+        return if (state.stage == StudyStage.EXAM) {
+            ExamScoring.questionMaxScore(activeStageQuestions.size)
+        } else {
+            ExamScoring.TOTAL_EXAM_SCORE
+        }
     }
 
     private fun runDoorOpen() {
@@ -495,6 +523,15 @@ class StudyFlow(
     private fun completedQuestionCountAfter(result: GradeResult): Int {
         completedAttemptCount += 1
         return completedAttemptCount
+    }
+
+    private fun scoreText(score: Double): String {
+        val rounded = round(score * 10.0) / 10.0
+        return if (abs(rounded % 1.0) < 0.0001) {
+            rounded.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.1f", rounded)
+        }
     }
 
     private fun initialDeviceChecks(): List<DeviceCheckItem> {

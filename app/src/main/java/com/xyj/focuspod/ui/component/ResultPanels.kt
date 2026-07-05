@@ -104,7 +104,7 @@ fun GradeResultPanel(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "${result?.score ?: 0} 分",
+                text = result?.let { "${scoreText(it.score)} / ${scoreText(it.maxScore)} 分" } ?: "0 分",
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
@@ -135,7 +135,7 @@ fun GradeResultPanel(
 
 @Composable
 fun DoorStatusPanel(
-    totalExamScore: Int,
+    totalExamScore: Double,
     passScore: Int,
     examPassed: Boolean?,
     completedQuestionCount: Int,
@@ -173,7 +173,7 @@ fun DoorStatusPanel(
             )
             Spacer(modifier = Modifier.height(18.dp))
             Text(
-                text = "考试成绩 ${totalExamScore} 分 · 达标分 ${passScore} 分 · 完成 ${completedQuestionCount} 题",
+                text = "考试成绩 ${scoreText(totalExamScore)} 分 · 达标分 ${passScore} 分 · 完成 ${completedQuestionCount} 题",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )

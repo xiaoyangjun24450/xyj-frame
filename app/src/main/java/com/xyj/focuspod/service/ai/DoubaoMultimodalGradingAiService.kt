@@ -18,6 +18,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.util.Locale
 
 data class DoubaoMultimodalConfig(
     val apiKey: String,
@@ -44,6 +45,7 @@ class DoubaoMultimodalGradingAiService(
         question: Question,
         imagePath: String,
         examRound: Int,
+        questionMaxScore: Double,
         callback: (Result<GradeResult>) -> Unit
     ) {
         if (!config.isReady()) {
@@ -52,7 +54,7 @@ class DoubaoMultimodalGradingAiService(
         }
 
         val requestBody = runCatching {
-            buildRequestBody(stage, question, imagePath, examRound)
+            buildRequestBody(stage, question, imagePath, examRound, questionMaxScore)
         }.getOrElse {
             callback(Result.failure(it))
             return
@@ -81,7 +83,7 @@ class DoubaoMultimodalGradingAiService(
                     }
 
                     val result = runCatching {
-                        parseGradeResult(raw, stage, question)
+                        parseGradeResult(raw, stage, question, questionMaxScore)
                     }
                     handler.post { callback(result) }
                 }
@@ -93,7 +95,8 @@ class DoubaoMultimodalGradingAiService(
         stage: StudyStage,
         question: Question,
         imagePath: String,
-        examRound: Int
+        examRound: Int,
+        questionMaxScore: Double
     ): JSONObject {
         val inputText = """
             当前阶段：${stage.name}
@@ -101,6 +104,7 @@ class DoubaoMultimodalGradingAiService(
             题目标题：${question.title}
             题干：${question.questionMarkdown}
             标准答案：${question.answer}
+            本题满分：${formatScore(questionMaxScore)} 分
             本题批卷要求：${question.gradingPrompt}
         """.trimIndent()
 
@@ -132,10 +136,10 @@ class DoubaoMultimodalGradingAiService(
             .put("max_output_tokens", MAX_OUTPUT_TOKENS)
             .put("thinking", JSONObject().put("type", "disabled"))
             .put("stream", false)
-            .put("text", JSONObject().put("format", gradeResultSchema()))
+            .put("text", JSONObject().put("format", gradeResultSchema(questionMaxScore)))
     }
 
-    private fun gradeResultSchema(): JSONObject {
+    private fun gradeResultSchema(questionMaxScore: Double): JSONObject {
         return JSONObject()
             .put("type", "json_schema")
             .put("name", "grading_result")
@@ -145,7 +149,7 @@ class DoubaoMultimodalGradingAiService(
                 .put(
                     "properties",
                     JSONObject()
-                        .put("score", JSONObject().put("type", "integer").put("minimum", 0).put("maximum", 100))
+                        .put("score", JSONObject().put("type", "number").put("minimum", 0).put("maximum", questionMaxScore))
                         .put("feedback", JSONObject().put("type", "string"))
                         .put("reason", JSONObject().put("type", "string"))
                         .put("suggestion", JSONObject().put("type", "string"))
@@ -155,7 +159,12 @@ class DoubaoMultimodalGradingAiService(
             )
     }
 
-    private fun parseGradeResult(raw: String, stage: StudyStage, question: Question): GradeResult {
+    private fun parseGradeResult(
+        raw: String,
+        stage: StudyStage,
+        question: Question,
+        questionMaxScore: Double
+    ): GradeResult {
         val root = JSONObject(raw)
         if (root.optString("status") == "incomplete") {
             val reason = root.optJSONObject("incomplete_details")?.optString("reason").orEmpty()
@@ -168,13 +177,20 @@ class DoubaoMultimodalGradingAiService(
         val jsonText = extractJsonText(outputText)
         Log.i(TAG, "Doubao grading result JSON=$jsonText")
         val resultJson = JSONObject(jsonText)
+        val rawScore = resultJson.optDouble("score", 0.0)
+        val score = if (rawScore.isFinite()) {
+            rawScore.coerceIn(0.0, questionMaxScore)
+        } else {
+            0.0
+        }
         return GradeResult(
             questionId = question.id,
             stage = stage,
-            score = resultJson.optInt("score").coerceIn(0, 100),
+            score = score,
             feedback = resultJson.optString("feedback", "已完成批改。"),
             reason = resultJson.optString("reason"),
-            suggestion = resultJson.optString("suggestion")
+            suggestion = resultJson.optString("suggestion"),
+            maxScore = questionMaxScore
         )
     }
 
@@ -234,6 +250,14 @@ class DoubaoMultimodalGradingAiService(
 
     private fun loadPromptAsset(): String {
         return context.assets.open(GRADING_PROMPT_ASSET_PATH).bufferedReader().use { it.readText() }
+    }
+
+    private fun formatScore(score: Double): String {
+        return if (score % 1.0 == 0.0) {
+            score.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.2f", score)
+        }
     }
 
     private companion object {

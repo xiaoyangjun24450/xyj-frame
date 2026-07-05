@@ -10,6 +10,7 @@ interface GradingAiService {
         question: Question,
         imagePath: String,
         examRound: Int,
+        questionMaxScore: Double,
         callback: (Result<GradeResult>) -> Unit
     )
 }

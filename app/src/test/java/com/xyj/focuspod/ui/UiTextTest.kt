@@ -5,6 +5,7 @@ import com.xyj.focuspod.model.GradingStep
 import com.xyj.focuspod.model.StudyStage
 import com.xyj.focuspod.ui.component.doorStatusText
 import com.xyj.focuspod.ui.component.gradingStepText
+import com.xyj.focuspod.ui.component.scoreText
 import com.xyj.focuspod.ui.component.stageText
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -30,5 +31,11 @@ class UiTextTest {
         assertEquals("正在开门", doorStatusText(DoorStatus.OPENING))
         assertEquals("开门成功", doorStatusText(DoorStatus.OPENED))
         assertEquals("开门失败", doorStatusText(DoorStatus.FAILED))
+    }
+
+    @Test
+    fun scoreTextShowsCleanDecimalScores() {
+        assertEquals("50", scoreText(50.0))
+        assertEquals("66.7", scoreText(66.66))
     }
 }
