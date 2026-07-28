@@ -13,17 +13,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xyj.focuspod.flow.StudyFlow
 import com.xyj.focuspod.model.StudyPlan
 import com.xyj.focuspod.model.StudySessionState
+import com.xyj.focuspod.service.device.FocusPodUsbCommandSender
 import com.xyj.focuspod.ui.component.AppScaffold
 import com.xyj.focuspod.ui.component.PlanCard
 import com.xyj.focuspod.ui.component.StatusChip
@@ -36,8 +39,16 @@ fun PlanSelectScreen(
     state: StudySessionState,
     flow: StudyFlow
 ) {
+    val context = LocalContext.current
+    val usbCommandSender = remember(context) { FocusPodUsbCommandSender(context) }
     var selectedPlan by remember(state.availablePlans) {
         mutableStateOf<StudyPlan?>(state.availablePlans.firstOrNull())
+    }
+    var usbStatus by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(usbCommandSender) {
+        usbCommandSender.register()
+        onDispose { usbCommandSender.unregister() }
     }
 
     AppScaffold(
@@ -80,6 +91,47 @@ fun PlanSelectScreen(
                     text = if (state.networkOnline) "网络在线" else "网络离线",
                     color = if (state.networkOnline) FocusSuccess else FocusWarning,
                     textColor = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = {
+                        usbCommandSender.sendCommand(0x01) { status ->
+                            usbStatus = status
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FocusPrimary),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                ) {
+                    Text(text = "发送 0x01")
+                }
+                Button(
+                    onClick = {
+                        usbCommandSender.sendCommand(0x00) { status ->
+                            usbStatus = status
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FocusWarning),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                ) {
+                    Text(text = "发送 0x00")
+                }
+            }
+            usbStatus?.let { status ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.height(28.dp))
