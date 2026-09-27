@@ -21,3 +21,4 @@ offline-deps/*.zip
 
 # Logs
 *.log
+.vscode
