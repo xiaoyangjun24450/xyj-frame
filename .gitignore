@@ -22,3 +22,5 @@ offline-deps/*.zip
 # Logs
 *.log
 .vscode
+# Local RISC-V cross toolchain (see mcu/READEM.md)
+.tools/

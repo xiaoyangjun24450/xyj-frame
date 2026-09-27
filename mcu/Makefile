@@ -1,114 +1,130 @@
+# FocusPod firmware - CH32X035G8U6 (RISC-V RV32IMAC)
+#
+# Toolchain: any bare-metal RISC-V GCC with rv32imac/ilp32 support.
+#   - auto detected in PATH (riscv64-unknown-elf-, riscv-none-elf-,
+#     riscv-none-embed- e.g. MounRiver Studio)
+#   - or set CROSS=/path/to/prefix-
+#   - the repository local toolchain (../.tools/root) is preferred if present
+
 TARGET = FocusPod
 
-FREQ_SYS = 24000000
+#######################################
+# Toolchain selection
 
-EXTERNAL_CRYSTAL = 1
+REPO_TOOLS := $(wildcard ../.tools/root/usr/bin)
+REPO_AS    := $(wildcard ../.tools/root/usr/lib/riscv64-unknown-elf/bin/as)
 
-XRAM_SIZE = 0x0400
-XRAM_LOC = 0x0400
-
-C_FILES = \
-	App/main.c \
-	App/time.c \
-	include/debug.c
-
-INCLUDE_DIR = \
-	include/ 
-
-ASM_FILES = 
-
-BUILD_DIR = build
-
-EXTRA_FLAGS = 
-
-pre-flash:
-
-#######################################################
-
-# toolchain
-CC = sdcc
-OBJCOPY = objcopy
-PACK_HEX = packihx
-WCHISP ?= wchisptool -g -f
-
-ifeq ($(OS),Windows_NT)
-RM = del /F /Q
-else
-RM = rm -fR
+ifneq ($(REPO_TOOLS),)
+  CROSS ?= $(REPO_TOOLS)/riscv64-unknown-elf-
+else ifeq ($(CROSS),)
+  CROSS := $(firstword $(foreach p,riscv64-unknown-elf- riscv-none-elf- riscv-none-embed-,\
+    $(if $(shell command -v $(p)gcc 2>/dev/null),$(p),)))
+endif
+ifneq ($(REPO_AS),)
+  # The Ubuntu cross gcc is configured with an absolute --with-as path;
+  # -B redirects it to the locally extracted binutils.
+  TOOLPREFIX := -B$(dir $(REPO_AS))
 endif
 
-#######################################################
+ifeq ($(CROSS),)
+  $(error No RISC-V bare-metal toolchain found. Install gcc-riscv64-unknown-elf (apt) or MounRiver Studio, or set CROSS=)
+endif
 
-EXTERNAL_CRYSTAL ?= 0
+CC      := $(CROSS)gcc
+OBJCOPY := $(CROSS)objcopy
+SIZE    := $(CROSS)size
 
-FREQ_SYS ?= 24000000
+WCHISP  ?= wchisp
 
-XRAM_SIZE ?= 0x0400
+#######################################
+# Sources
 
-XRAM_LOC ?= 0x0000
+APP_DIR     := App
+DRV_DIR     := Driver
+EVT_SRC     := hardware/EXAM/SRC
 
-CODE_SIZE ?= 0x4000
+CFILES := \
+	$(APP_DIR)/main.c \
+	$(APP_DIR)/board.c \
+	$(APP_DIR)/cc_power.c \
+	$(APP_DIR)/time.c \
+	$(APP_DIR)/delay.c \
+	$(APP_DIR)/usbh_aoa.c \
+	$(APP_DIR)/system_ch32x035.c \
+	$(DRV_DIR)/ch32x035_usbfs_host.c \
+	$(DRV_DIR)/libc_stubs.c \
+	$(EVT_SRC)/Core/core_riscv.c \
+	$(EVT_SRC)/Peripheral/src/ch32x035_rcc.c \
+	$(EVT_SRC)/Peripheral/src/ch32x035_gpio.c \
+	$(EVT_SRC)/Peripheral/src/ch32x035_adc.c \
+	$(EVT_SRC)/Peripheral/src/ch32x035_tim.c \
+	$(EVT_SRC)/Peripheral/src/ch32x035_usart.c \
+	$(EVT_SRC)/Peripheral/src/ch32x035_flash.c
 
-ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ASFILES := \
+	$(EVT_SRC)/Startup/startup_ch32x035.S
 
-CFLAGS := -V -mmcs51 --model-small \
-	--xram-size $(XRAM_SIZE) --xram-loc $(XRAM_LOC) \
-	--code-size $(CODE_SIZE) \
-	-I$(ROOT_DIR)$(INCLUDE_DIR) -DFREQ_SYS=$(FREQ_SYS) -DEXTERNAL_CRYSTAL=$(EXTERNAL_CRYSTAL) \
-	$(EXTRA_FLAGS)
+LINKER := $(EVT_SRC)/Ld/Link.ld
 
-LFLAGS := $(CFLAGS)
+#######################################
+# Flags
 
-RELS := $(C_FILES:.c=.rel)
+CPUFLAGS := -march=rv32imac -mabi=ilp32 -msmall-data-limit=8 $(TOOLPREFIX)
 
-print-%  : ; @echo $* = $($*)
+INCFLAGS := \
+	-I$(APP_DIR) \
+	-I$(DRV_DIR) \
+	-I$(EVT_SRC)/Peripheral/inc \
+	-I$(EVT_SRC)/Core
 
-ifeq ($(BUILD_DIR),) 
-BUILD_FLAG = 
-BUILDDIR=
-else
-BUILDDIR=$(BUILD_DIR)/
-BUILD_FLAG = -o $(BUILDDIR)
+CFLAGS := $(CPUFLAGS) -O2 -g3 -Wall -Wextra \
+	-DUSE_STDPERIPH_DRIVER \
+	-ffunction-sections -fdata-sections -fno-common \
+	$(INCFLAGS)
+
+ASFLAGS := $(CPUFLAGS) $(INCFLAGS)
+
+BUILD_DIR := build
+
+LDFLAGS := $(CPUFLAGS) -nostartfiles -nostdlib -static \
+	-Wl,--gc-sections -T $(LINKER) \
+	-Wl,-Map=$(BUILD_DIR)/$(TARGET).map \
+	-lgcc
+
+OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(CFILES)) \
+	$(patsubst %.S,$(BUILD_DIR)/%.o,$(ASFILES))
+
+#######################################
+# Rules
+
+.PHONY: all clean flash
+
+all: $(TARGET).bin $(TARGET).hex
+	$(SIZE) $(BUILD_DIR)/$(TARGET).elf
+
 $(BUILD_DIR):
-	mkdir $@
-endif
+	mkdir -p $@
 
-%.rel : %.c
-	$(CC) -c $(CFLAGS) $(BUILD_FLAG) $<
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Note: SDCC will dump all of the temporary files into this one, so strip the paths from RELS
-# For now, get around this by stripping the paths off of the RELS list.
+$(BUILD_DIR)/%.o: %.S
+	@mkdir -p $(dir $@)
+	$(CC) $(ASFLAGS) -c $< -o $@
 
-$(TARGET).ihx: $(RELS)
-	$(CC) $(patsubst %,$(BUILDDIR)%,$(notdir $(RELS))) $(LFLAGS) -o $(BUILD_DIR)/$(TARGET).ihx
+$(BUILD_DIR)/$(TARGET).elf: $(OBJS) $(LINKER)
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
-$(TARGET).hex: $(TARGET).ihx
-	$(PACK_HEX) $(BUILD_DIR)/$(TARGET).ihx > $(TARGET).hex
+$(TARGET).bin: $(BUILD_DIR)/$(TARGET).elf
+	$(OBJCOPY) -O binary $< $@
 
-$(TARGET).bin: $(TARGET).ihx
-	$(OBJCOPY) -I ihex -O binary $(BUILD_DIR)/$(TARGET).ihx $(TARGET).bin
-	
-flash: $(TARGET).bin pre-flash
-	$(WCHISP) $(TARGET).bin
+$(TARGET).hex: $(BUILD_DIR)/$(TARGET).elf
+	$(OBJCOPY) -O ihex $< $@
 
-.DEFAULT_GOAL := all
-all: $(BUILD_DIR) $(TARGET).bin $(TARGET).hex
-
-
+# USB ISP flashing: hold SW1 while powering the board from J2 (see READEM.md)
+flash: $(TARGET).bin
+	$(WCHISP) flash $<
 
 clean:
-	$(RM) \
-	$(BUILD_DIR) \
-	$(notdir $(RELS:.rel=.asm)) \
-	$(notdir $(RELS:.rel=.lst)) \
-	$(notdir $(RELS:.rel=.mem)) \
-	$(notdir $(RELS:.rel=.rel)) \
-	$(notdir $(RELS:.rel=.rst)) \
-	$(notdir $(RELS:.rel=.sym)) \
-	$(notdir $(RELS:.rel=.adb)) \
-	$(TARGET).lk \
-	$(TARGET).map \
-	$(TARGET).mem \
-	$(TARGET).ihx \
-	$(TARGET).hex \
-	$(TARGET).bin
+	rm -rf $(BUILD_DIR) $(TARGET).bin $(TARGET).hex

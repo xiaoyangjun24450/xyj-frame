@@ -1,115 +1,45 @@
-#include <stdint.h>
-#include <string.h>
-#include "ch552.h"
-
+/********************************** (C) COPYRIGHT *******************************
+ * File Name          : time.c
+ * Description        : 1 kHz free running tick based on TIM2 (polled).
+ *********************************************************************************/
+#include "ch32x035.h"
 #include "time.h"
 
-uint16_t __xdata utick;
-
-void time_MsTick_init(void)
+void time_Init(void)
 {
-    utick = 0;
-    T2MOD |= (bTMR_CLK | bT2_CLK);
-    C_T2 = 0;
-    RCLK = 0;
-    TCLK = 0;
-    CP_RL2 = 0;
-    //mTimer_x_ModInit(2, 1);
-    mTimer_x_SetData(2, 24000); // 1ms
-    TR2 = 1;
-    ET2 = 1;
-}
+    TIM_TimeBaseInitTypeDef tim = {0};
 
-void time_MsTick_Inc(void)
-{
-    utick = utick + 1;
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    /* 48 MHz / (48000-1) = 1 kHz, counter wraps every ~65.5 s: 1 tick == 1 ms */
+    tim.TIM_Period            = 0xFFFF;
+    tim.TIM_Prescaler         = 48000 - 1;
+    tim.TIM_ClockDivision     = TIM_CKD_DIV1;
+    tim.TIM_CounterMode       = TIM_CounterMode_Up;
+    tim.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(TIM2, &tim);
+
+    TIM_Cmd(TIM2, ENABLE);
 }
 
 uint16_t time_MsTick_Get(void)
 {
-    return utick;
+    return (uint16_t)TIM_GetCounter(TIM2);
 }
 
-void time_MsTick_Delay(uint16_t delay)
+uint16_t time_ElapsedMs(uint16_t since)
 {
-    uint16_t __xdata tickstart = time_MsTick_Get();
-    uint16_t __xdata wait = delay;
-
-    /* Add a freq to guarantee minimum wait */
-    if (wait < 65535)
-    {
-        wait += 1;
-    }
-
-    while ((time_MsTick_Get() - tickstart) < wait)
-    {
-    }
+    return (uint16_t)(time_MsTick_Get() - since);
 }
 
-void time_MsTickInterrupt(void)
+uint8_t time_EveryMs(uint16_t *cookie, uint16_t period_ms)
 {
-    utick++;
-    TF2 = 0;                                                                                                                  
-}
+    uint16_t now = time_MsTick_Get();
 
-/*******************************************************************************
-* Function Name  : mTimer_x_ModInit(UINT8 x ,UINT8 mode)
-* Description    : CH554定时计数器x模式设置
-* Input          : UINT8 mode,Timer模式选择
-                   0：模式0，13位定时器，TLn的高3位无效
-                   1：模式1，16位定时器
-                   2：模式2，8位自动重装定时器
-                   3：模式3，两个8位定时器  Timer0
-                   3：模式3，Timer1停止									 
-* Output         : None
-* Return         : 成功  SUCCESS
-                   失败  FAIL
-*******************************************************************************/
-uint8_t mTimer_x_ModInit(uint8_t x, uint8_t mode)
-{
-    if (x == 0)
+    if ((uint16_t)(now - *cookie) >= period_ms)
     {
-        TMOD = TMOD & 0xf0 | mode;
-    }
-    else if (x == 1)
-    {
-        TMOD = TMOD & 0x0f | (mode << 4);
-    }
-    else if (x == 2)
-    {
-        RCLK = 0;
-        TCLK = 0;
-        CP_RL2 = 0;
-    } //16位自动重载定时器
-    else
+        *cookie = now;
         return 1;
+    }
     return 0;
-}
-
-/*******************************************************************************
-* Function Name  : mTimer_x_SetData(UINT8 x,UINT16 dat)
-* Description    : CH554Timer0 TH0和TL0赋值
-* Input          : UINT16 dat;定时器赋值
-* Output         : None
-* Return         : None
-*******************************************************************************/
-void mTimer_x_SetData(uint8_t x, uint16_t dat)
-{
-    uint16_t __xdata tmp;
-    tmp = 65536 - dat;
-    if (x == 0)
-    {
-        TL0 = tmp & 0xff;
-        TH0 = (tmp >> 8) & 0xff;
-    }
-    else if (x == 1)
-    {
-        TL1 = tmp & 0xff;
-        TH1 = (tmp >> 8) & 0xff;
-    }
-    else if (x == 2)
-    {
-        RCAP2L = TL2 = tmp & 0xff; //16位自动重载定时器
-        RCAP2H = TH2 = (tmp >> 8) & 0xff;
-    }
 }

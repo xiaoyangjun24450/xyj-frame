@@ -1,2 +1,14 @@
+# Build outputs
+build/
 *.bin
 *.hex
+*.o
+*.d
+*.elf
+*.map
+*.lst
+
+# WCH EVT SDK examples: only SRC/ (headers, startup, linker script) is needed
+# by the Makefile; the ~24MB of demo projects stay out of the repo.
+hardware/EXAM/*
+!hardware/EXAM/SRC/
