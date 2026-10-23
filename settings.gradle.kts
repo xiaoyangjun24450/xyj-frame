@@ -20,4 +20,10 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "XYJ"
-include(":app")
+// Each immediate apps/ directory with a build file is an independent application.
+file("apps").listFiles()?.filter { it.isDirectory && it.resolve("build.gradle.kts").isFile }
+    ?.sortedBy { it.name }?.forEach { app ->
+        require(app.name.matches(Regex("[a-z][a-z0-9-]*"))) { "Invalid app directory: ${app.name}" }
+        include(":${app.name}")
+        project(":${app.name}").projectDir = app
+    }

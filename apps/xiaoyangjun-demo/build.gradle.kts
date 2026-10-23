@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 val versionProperties = Properties().apply {
-    rootProject.file("version.properties").inputStream().use { load(it) }
+    project.file("version.properties").inputStream().use { load(it) }
 }
 
 plugins {
