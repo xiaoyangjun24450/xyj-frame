@@ -62,7 +62,7 @@
 
 ## 多 App 开发
 
-每个 App 放在 `apps/<名称>/`，拥有独立的源码、`build.gradle.kts`、`version.properties` 和两个 `.bat` 入口。工具、Gradle 配置和版本目录在仓库根目录共用。现有应用为“小羊君demo”（目录 `xiaoyangjun-demo`），Gradle 模块为 `:xiaoyangjun-demo`，原应用包名保持不变。
+每个 App 放在 `apps/<名称>/`，拥有独立的源码、`build.gradle.kts`、`version.properties` 和两个 `.bat` 入口。工具、Gradle 配置和版本目录在仓库根目录共用。现有应用为“小羊君demo”（目录 `xiaoyangjun-demo`），Gradle 模块为 `:xiaoyangjun-demo`，demo 使用独立安装包标识，见下方应用列表。
 
 新增 App：
 
@@ -74,3 +74,20 @@
 可在任意工作目录调用 App 的入口，也可进入 App 文件夹直接运行。日志脚本从该 App 的构建结果读取包名，首次使用前需编译。当前入口针对标准 debug 构建，未支持 product flavors 或拆分 APK。
 
 每个 App 独立编译和安装；不传 App 名称时，共用脚本不会默认操作其他应用。新增 App 的业务配置建议放在各自命名空间下，避免共用配置键互相覆盖。
+
+## 从 GitHub 迁入 App
+
+仓库内提供技能：`.agents/skills/import-github-android-app/SKILL.md`。它会克隆完整独立 Git 仓库到 apps 下，保留来源历史、远程和 Gradle 工程，再适配共用 Windows 工具环境。
+
+给 Agent 的示例请求：
+
+```text
+请读取并使用 .agents/skills/import-github-android-app/SKILL.md，
+把 https://github.com/组织/仓库 迁入当前项目开发，按现有 Windows 编译方式接入。
+保留原有功能，完成构建验证并更新文档。
+```
+
+如果客户端已发现该技能，也可用 `$import-github-android-app` 调用。仓库文件存在不代表当前会话已经自动加载，按路径读取的方式可直接使用。
+
+
+独立项目复用 `.tools` 和 `.gradle-home`，保留自身依赖、模块及配置。入口运行在子仓库根目录；`windows-host.json` 指定构建任务与 APK 元数据位置。宿主自有 App 仍按前面的多模块方式开发。

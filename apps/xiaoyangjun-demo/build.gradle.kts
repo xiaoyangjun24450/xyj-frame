@@ -15,7 +15,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.xyj.focuspod"
+        applicationId = "com.xyj.xiaoyangjundemo"
         minSdk = 24
         targetSdk = 36
         versionCode = versionProperties.getProperty("VERSION_CODE").toInt()

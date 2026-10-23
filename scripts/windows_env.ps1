@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 function Initialize-BuildEnvironment {
+    param([string]$BuildRoot = $ProjectRoot)
     $localJava = Join-Path $ProjectRoot '.tools\jdk'
     if (Test-Path "$localJava\bin\java.exe") { $env:JAVA_HOME = $localJava }
     if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\javac.exe")) {
@@ -15,7 +16,7 @@ function Initialize-BuildEnvironment {
     $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
     $env:GRADLE_USER_HOME = Join-Path $ProjectRoot '.gradle-home'
     # Preserve other local properties; replace only the machine-specific SDK location.
-    $file = Join-Path $ProjectRoot 'local.properties'
+    $file = Join-Path $BuildRoot 'local.properties'
     $lines = @()
     if (Test-Path $file) { $lines = @(Get-Content $file | Where-Object { $_ -notmatch '^\s*sdk\.dir\s*=' }) }
     $sdkPath = $env:ANDROID_HOME.Replace('\','/').Replace(':','\:')
@@ -60,5 +61,3 @@ function Get-ProjectGradle {
     }
     return (Join-Path $ProjectRoot 'scripts\gradlew.bat')
 }
-
-

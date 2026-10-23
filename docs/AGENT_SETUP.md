@@ -114,3 +114,9 @@ Windows 构建脚本会先验证本地 ZIP 的 SHA-256，再解压到 `.tools/gr
 官方 SHA-256：`bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531`，来源：https://services.gradle.org/distributions/gradle-8.14.3-bin.zip.sha256 。
 
 这只解决 Gradle 本体下载；首次构建的 Android/Kotlin 插件和 Maven 依赖仍需联网，后续若报下载失败应单独排查。
+
+## 独立 Git 项目
+
+从 GitHub 克隆到 `apps/<名称>/` 的独立项目保留自身 `.git`、Gradle settings 和模块结构，不加入宿主的模块发现。通过项目内 windows_build.bat 调用宿主 scripts/windows_repository.ps1，复用工具但在独立项目根执行构建。SDK 配置写入该项目自己的 local.properties，不合并服务凭据。
+
+windows-host.json 声明目标任务和 APK 元数据路径。独立项目须兼容所选共享工具版本；不兼容时先评估独立工具链，不覆盖宿主或源码根配置。嵌套 checkout 由宿主精确忽略，分别提交；克隆宿主不会自动获取这些项目。
